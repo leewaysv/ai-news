@@ -1,0 +1,18 @@
+{
+  "name": "ai-news-blog",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI 早报 — 每日 AI 新闻早报博客",
+  "scripts": {
+    "dev": "hugo server --buildDrafts",
+    "build": "hugo --gc --minify",
+    "preview": "hugo server"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.5.2",
+    "postcss": "^8.5.16",
+    "postcss-cli": "^11.0.1",
+    "tailwindcss": "^4.3.2",
+    "@tailwindcss/postcss": "^4.3.2"
+  }
+}

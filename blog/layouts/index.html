@@ -1,0 +1,42 @@
+{{ define "main" }}
+<div class="space-y-10">
+  <!-- 站点描述 -->
+  <div class="text-center py-6">
+    <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-3">
+      {{ .Site.Title }}
+    </h1>
+    <p class="text-lg text-gray-500 dark:text-gray-400">
+      {{ .Site.Params.description }}
+    </p>
+  </div>
+
+  <!-- 订阅提示 -->
+  <div class="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-xl p-4 text-center">
+    <p class="text-sm text-blue-700 dark:text-blue-300">
+      每日更新 · 精选 AI 资讯
+      <a href="{{ "feed.xml" | relURL }}" class="font-medium underline hover:no-underline">RSS 订阅</a>
+    </p>
+  </div>
+
+  <!-- 文章列表 -->
+  <div class="space-y-8">
+    {{- $pages := where .Site.RegularPages "Section" "articles" }}
+    {{- $grouped := $pages.GroupByDate "2006-01-02" "desc" }}
+    {{- range $grouped }}
+      <section class="article-fade-in">
+        <h2 class="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-4">
+          {{ .Key }}
+        </h2>
+        <div class="space-y-3">
+          {{- range .Pages }}
+            {{ partial "article-card.html" . }}
+          {{- end }}
+        </div>
+      </section>
+    {{- end }}
+  </div>
+
+  <!-- 分页 -->
+  {{- template "_internal/pagination.html" . }}
+</div>
+{{ end }}

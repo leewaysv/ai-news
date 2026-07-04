@@ -1,0 +1,14 @@
+# 站点参数
+description = "每日 AI 新闻早报 — 精选最重要的 AI 资讯，用中文呈现"
+author = "AI 早报编辑部"
+
+# 社交链接
+social = [
+  { name = "rss", url = "/feed.xml" }
+]
+
+# UI
+ui = { dark_mode_toggle = true }
+
+# AIGC 声明
+aigc_disclaimer = "本文由 AI 辅助生成，仅供参考。如有不准确之处，欢迎指正。"

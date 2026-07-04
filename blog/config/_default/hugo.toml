@@ -1,0 +1,56 @@
+baseURL = "https://ai-news.example.com"
+title = "AI 早报"
+languageCode = "zh-CN"
+
+# Content
+summaryLength = 30
+
+[pagination]
+  pagerSize = 10
+
+# Build
+buildDrafts = false
+buildFuture = false
+buildExpired = false
+enableGitInfo = true
+
+# Output
+hasCJKLanguage = true
+pluralizeListTitles = false
+
+# RSS
+[outputs]
+  home = ["HTML", "RSS"]
+  section = ["HTML", "RSS"]
+  taxonomy = ["HTML", "RSS"]
+  term = ["HTML", "RSS"]
+
+[outputFormats]
+  [outputFormats.RSS]
+    baseName = "feed"
+    limit = 50
+
+# Sitemap
+[sitemap]
+  changefreq = "daily"
+  priority = 0.5
+  filename = "sitemap.xml"
+
+# Taxonomy
+[taxonomies]
+  category = "categories"
+  tag = "tags"
+
+# Markdown
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+  [markup.highlight]
+    codeFences = true
+    guessSyntax = true
+    lineNos = false
+
+# Build config
+[build]
+  writeStats = true

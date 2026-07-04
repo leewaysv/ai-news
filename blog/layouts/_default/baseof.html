@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="{{ .Site.LanguageCode }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ if .IsHome }}{{ .Site.Title }}{{ else }}{{ .Title }} — {{ .Site.Title }}{{ end }}</title>
+  <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+
+  {{- $css := resources.Get "css/main.css" | css.PostCSS }}
+  {{- if hugo.IsProduction }}
+    {{- $css = $css | minify | fingerprint }}
+  {{- end }}
+  <link rel="stylesheet" href="{{ $css.RelPermalink }}" {{ if hugo.IsProduction }}integrity="{{ $css.Data.Integrity }}"{{ end }}>
+
+  {{- with .OutputFormats.Get "RSS" }}
+  <link href="{{ .RelPermalink }}" rel="alternate" type="application/rss+xml" title="{{ $.Site.Title }}">
+  {{- end }}
+
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+
+  {{ template "_internal/opengraph.html" . }}
+  {{ template "_internal/schema.html" . }}
+
+  {{ if hugo.IsProduction }}{{ template "_internal/google_analytics.html" . }}{{ end }}
+</head>
+<body class="min-h-screen flex flex-col">
+  {{ partial "header.html" . }}
+
+  <main class="flex-1 w-full max-w-4xl mx-auto px-4 py-8">
+    {{ block "main" . }}{{ end }}
+  </main>
+
+  {{ partial "footer.html" . }}
+
+  {{- $js := resources.Get "js/main.js" | js.Build | minify }}
+  <script src="{{ $js.RelPermalink }}" defer></script>
+</body>
+</html>

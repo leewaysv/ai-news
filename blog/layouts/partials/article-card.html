@@ -1,0 +1,28 @@
+<article class="article-card">
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex-1 min-w-0">
+      <h3 class="article-card-title text-lg font-semibold text-gray-900 dark:text-white mb-1.5">
+        <a href="{{ .RelPermalink }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline">
+          {{ .Title }}
+        </a>
+      </h3>
+      {{- with .Params.summary }}
+        <p class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">{{ . }}</p>
+      {{- end }}
+    </div>
+  </div>
+  <div class="flex items-center gap-3 mt-3 text-xs text-gray-400 dark:text-gray-500">
+    {{- with .Params.source }}
+      <span class="truncate max-w-[200px]">{{ . }}</span>
+    {{- end }}
+    <span>{{ .Date.Format "15:04" }}</span>
+    {{- if .Params.aigc }}
+      <span class="tag">AI 辅助</span>
+    {{- end }}
+    {{- range .Params.categories }}
+      <a href="{{ "/categories/" | relURL }}{{ . | urlize }}" class="tag hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+        {{ . }}
+      </a>
+    {{- end }}
+  </div>
+</article>
