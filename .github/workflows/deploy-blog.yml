@@ -27,8 +27,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-          cache-dependency-path: blog/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -37,8 +35,9 @@ jobs:
         run: hugo --gc --minify
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy public --project-name=ai-news --branch=master
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          npx wrangler@latest pages deploy public \
+            --project-name=ai-news \
+            --branch=master
