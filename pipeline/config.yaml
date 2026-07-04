@@ -1,0 +1,131 @@
+# ============================================================
+# AI News Pipeline 配置
+# ============================================================
+
+# ------ 模型配置 ------
+llm:
+  # Claude API
+  api_key: "${ANTHROPIC_API_KEY}"     # 从环境变量读取
+  model: "claude-sonnet-5-20251001"    # 摘要用模型
+  cheap_model: "claude-haiku-4-5-20251001"  # 预过滤用模型
+  max_tokens: 4096
+
+embedding:
+  model: "all-MiniLM-L6-v2"           # 本地 embedding 模型
+  threshold: 0.75                      # 相似度阈值（低于此值丢弃）
+
+# ------ 管道配置 ------
+pipeline:
+  timezone: "Asia/Shanghai"
+  output_dir: "../blog/content/articles"
+  max_articles_per_digest: 8
+  min_articles_to_publish: 3           # 低于此数量则跳过当天
+  source_weights:
+    openai: 10
+    google: 9
+    meta: 9
+    deepmind: 9
+    anthropic: 9
+    techcrunch: 7
+    theverge: 7
+    mit: 8
+    huggingface: 8
+    arxiv: 6
+    github: 6
+    default: 5
+
+# ------ 新闻源 ------
+news_sources:
+  # ---- 英文 RSS ----
+  - id: openai-blog
+    name: "OpenAI Blog"
+    type: rss
+    url: "https://openai.com/blog/rss.xml"
+    lang: en
+    categories: ["llm", "research"]
+
+  - id: google-ai
+    name: "Google AI Blog"
+    type: rss
+    url: "https://blog.research.google/atom.xml"
+    lang: en
+    categories: ["research", "ml"]
+
+  - id: meta-ai
+    name: "Meta AI"
+    type: rss
+    url: "https://ai.meta.com/blog/rss/"
+    lang: en
+    categories: ["research", "llm"]
+
+  - id: deepmind
+    name: "DeepMind"
+    type: rss
+    url: "https://deepmind.google/blog/rss.xml"
+    lang: en
+    categories: ["research", "ml"]
+
+  - id: anthropic
+    name: "Anthropic"
+    type: rss
+    url: "https://www.anthropic.com/feed.xml"
+    lang: en
+    categories: ["llm", "research", "safety"]
+
+  - id: huggingface
+    name: "Hugging Face Blog"
+    type: rss
+    url: "https://huggingface.co/blog/feed.xml"
+    lang: en
+    categories: ["open-source", "ml"]
+
+  - id: mit-news
+    name: "MIT News AI"
+    type: rss
+    url: "https://news.mit.edu/topic/artificial-intelligence2/rss"
+    lang: en
+    categories: ["research", "education"]
+
+  - id: techcrunch-ai
+    name: "TechCrunch AI"
+    type: rss
+    url: "https://techcrunch.com/category/artificial-intelligence/feed/"
+    lang: en
+    categories: ["industry", "startup"]
+
+  - id: theverge-ai
+    name: "The Verge AI"
+    type: rss
+    url: "https://www.theverge.com/ai-artificial-intelligence/rss"
+    lang: en
+    categories: ["industry", "policy"]
+
+  # ---- 英文 API ----
+  - id: hackernews
+    name: "Hacker News"
+    type: api
+    url: "https://hacker-news.firebaseio.com/v0/topstories.json"
+    lang: en
+    categories: ["community", "tech"]
+
+  - id: github-trending
+    name: "GitHub Trending"
+    type: api
+    url: "https://api.github.com/search/repositories?q=topic:ai+sort:stars&per_page=20"
+    lang: en
+    categories: ["open-source", "tools"]
+
+  # ---- 中文源 ----
+  - id: jiqizhixin
+    name: "机器之心"
+    type: scrape
+    url: "https://www.jiqizhixin.com/"
+    lang: zh
+    categories: ["industry", "research"]
+
+  - id: liangzita
+    name: "量子位"
+    type: scrape
+    url: "https://www.qbitai.com/"
+    lang: zh
+    categories: ["industry", "tools"]
