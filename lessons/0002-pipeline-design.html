@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 2：Pipeline 实现思路与技术细节 — AI News 教学</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<div class="lesson">
+
+  <h1>🏗️ Pipeline 实现思路与技术细节</h1>
+  <div class="lesson-meta">
+    Lesson 2 · 预计阅读：15 分钟 · 难度：入门 · 关联：<a href="../reference/glossary.html">术语表</a>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>1. Pipeline 是什么</h2>
+
+  <p>Pipeline（管道）是项目的<b>大脑</b>——一个 Python 程序，负责每天早上自动完成新闻编辑的工作：</p>
+
+  <div class="diagram">     采集新闻  →  筛选过滤  →  AI 摘要  →  质量检查  →  格式转换  →  发布
+        │            │           │           │            │          │
+    gather/      filter/    summarize/    qa/        adapt/     publish/</div>
+
+  <p>整套流程是<b>单向流水线</b>：前一步的输出是下一步的输入。没有回头路，没有循环——每一步只管自己的事，然后把结果传给下一步。</p>
+
+  <div class="callout">
+    <div class="callout-title">🔑 理解 Pipeline 的关键</div>
+    <p>这就好比一条工厂生产线。原材料（新闻）从一头进来，经过每道工序，最后变成成品（.md 文章文件）从另一头出去。你不需要理解每个工序的全部细节——但要知道它们怎么衔接。</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>2. 数据流：文章在管道中的"变形"</h2>
+
+  <p>文章在流过管道的过程中，形态变了三次。理解这三步变形就理解了整个系统的一半：</p>
+
+  <table>
+    <tr><th>步骤</th><th>数据形态</th><th>从哪来</th><th>到哪去</th></tr>
+    <tr>
+      <td>① 采集（gather）</td>
+      <td><code>RawArticle</code></td>
+      <td>互联网（RSS/API/爬虫）</td>
+      <td>过滤器</td>
+    </tr>
+    <tr>
+      <td>② 摘要（summarize）</td>
+      <td><code>ProcessedArticle</code></td>
+      <td>LLM 处理后</td>
+      <td>质量检查</td>
+    </tr>
+    <tr>
+      <td>③ 发布（publish）</td>
+      <td><code>.md 文件</code></td>
+      <td>适配器转换后</td>
+      <td>Hugo 的 content/ 目录</td>
+    </tr>
+  </table>
+
+  <p>这三个数据形态在 <code>pipeline/src/models.py</code> 中定义，用的 Pydantic 库。你可以打开看看——每个字段都有中文注释，很好懂。</p>
+
+  <!-- ============================================================ -->
+  <h2>3. 六步拆解</h2>
+
+  <h3>Step 1: gather/（采集）</h3>
+  <p>三种采集方式对应三种新闻源类型：</p>
+
+  <table>
+    <tr><th>采集方式</th><th>对应源</th><th>Python 文件</th></tr>
+    <tr><td><b>RSS</b></td><td>OpenAI Blog、Google AI 等有 RSS 的站点</td><td><code>rss_collector.py</code></td></tr>
+    <tr><td><b>API</b></td><td>HackerNews、GitHub Trending</td><td><code>api_collector.py</code></td></tr>
+    <tr><td><b>Scrape（爬虫）</b></td><td>机器之心、量子位（无 RSS）</td><td><code>scraper.py</code></td></tr>
+  </table>
+
+  <p>采集器的返回值都是 <code>list[RawArticle]</code>。主程序把所有采集器的结果合并成一个列表。</p>
+
+  <div class="callout">
+    <div class="callout-title">💡 异步（async）不是必须懂的</div>
+    <p>你可能注意到 <code>api_collector.py</code> 和 <code>scraper.py</code> 用了 <code>async/await</code>。这是因为它们要等网络响应（HTTP 请求），Python 的 async 让这段时间可以去干别的事，而不是干等。RSS 采集器用的 feedparser 没有 async 版本，所以是同步的。混着用没毛病。</p>
+  </div>
+
+  <h3>Step 2: filter/（筛选）</h3>
+  <p>从几百条新闻中挑出 AI 相关的内容。分为两级，成本从低到高：</p>
+
+  <dl>
+    <dt>第一级：关键词过滤（免费）</dt>
+    <dd>用 <code>AI_KEYWORDS</code> 列表检查标题和正文。命中关键词越多得分越高。得分低于阈值直接扔。这一步会砍掉 60-70% 的无关内容（体育、娱乐、纯财经等）。</dd>
+
+    <dt>第二级：LLM 精判（花钱）</dt>
+    <dd>通过第一级的文章（约 30-40 篇），每 10 篇一批递给 DeepSeek，让它判断哪些"与 AI 行业高度相关"。这一步会进一步筛选到 10-15 篇。</dd>
+  </dl>
+
+  <div class="callout">
+    <div class="callout-title">💰 为什么需要两级过滤</div>
+    <p>LLM 调用是按量计费的。如果一次性把 100 篇原文都丢给 DeepSeek，不仅慢，而且贵。先用免费的关键词规则砍掉大部分噪声，只让 LLM 处理"已经有点像 AI 新闻"的候选项——这是整条管道里最重要的<b>成本控制策略</b>。</p>
+  </div>
+
+  <p>另外，在过滤之前还有一步 <b>dedup（去重）</b>。同一篇新闻可能被多个源报道（比如 OpenAI 自己的 Blog + TechCrunch 的报道），用 URL 和 hash 去重，避免重复内容。</p>
+
+  <h3>Step 3: summarize/（摘要）</h3>
+  <p>这是调 LLM 的核心环节：</p>
+
+  <ol>
+    <li><b>单篇摘要</b>：对每篇文章调用 DeepSeek，要求输出中文标题、1-2 句摘要、关键要点、分类标签</li>
+    <li><b>早报标题</b>：全部摘要完成后，再把文章列表汇总给 DeepSeek，让它为今天的早报想一个总标题</li>
+  </ol>
+
+  <p>提示词模板在 <code>summarize/prompt.py</code> 里，要求 LLM 返回严格 JSON 格式：</p>
+
+<pre>{
+  "title": "中文标题",
+  "summary": "中文摘要",
+  "key_points": ["要点1", "要点2"],
+  "categories": ["分类1"],
+  "tags": ["tag1"]
+}</pre>
+
+  <h3>Step 4: qa/（质量检查）</h3>
+  <p>验证 LLM 生成的摘要"没乱说"。两种机制：</p>
+
+  <ul>
+    <li><b>Embedding 相似度</b>：用 <code>sentence-transformers</code> 把原文和摘要都转成向量，算余弦相似度。低于阈值说明摘要可能偏离原文，丢弃。</li>
+    <li><b>兜底策略</b>：如果当天通过 QA 的文章不足 3 篇，跳过发布，不发"没什么好说的"那种早报。</li>
+  </ul>
+
+  <div class="callout">
+    <div class="callout-title">🔧 当前状态：跨语言跳过</div>
+    <p>目前咱们的源主要是英文，但摘要是中文。英文原文和中文摘要的 embedding 相似度天然偏低，所以 QA 模块对英文源跳过了校验。如果你以后加了中文源（原文是中文、摘要是中文），QA 就会实际生效。</p>
+  </div>
+
+  <h3>Step 5: adapt/（适配）</h3>
+  <p>把内部数据模型转为 Hugo 能识别的 Markdown 文件。具体工作：</p>
+
+  <ul>
+    <li>生成 YAML frontmatter（标题、日期、分类、标签等）</li>
+    <li>把摘要和 key_points 排版成 Markdown 正文</li>
+    <li>生成文件名（如 <code>2026-07-04-en-openai-gpt-56-sol.md</code>）</li>
+  </ul>
+
+  <p>适配器使用<b>策略模式</b>——以后如果添加微信或抖音的适配器，只需要新增一个类，不影响已有代码。</p>
+
+  <h3>Step 6: publish/（发布）</h3>
+  <p>最后一步最简单：把适配器生成的字符串写入对应的文件路径。</p>
+
+  <!-- ============================================================ -->
+  <h2>4. 配置驱动：config.yaml 是控制中心</h2>
+
+  <p>Pipeline 的大部分行为由 <code>config.yaml</code> 控制，改配置不需要改代码：</p>
+
+<pre># 改这里就能控制管道行为：
+llm:
+  model: "deepseek-chat"      # 换模型
+  max_tokens: 4096            # 控制摘要长度
+
+pipeline:
+  max_articles_per_digest: 8  # 每天最多发几篇
+  min_articles_to_publish: 3  # 少于几篇就跳过
+  source_weights:
+    openai-blog: 10           # 热度排序权重
+    default: 5</pre>
+
+  <!-- ============================================================ -->
+  <h2>5. 主程序编排：main.py 怎么串起来</h2>
+
+  <p><code>main.py</code> 里的 <code>run()</code> 方法就是管道的总指挥。它的核心结构：</p>
+
+<pre>async def run(self):
+    # 1. 采集 —— 分别从 RSS、API、爬虫收集
+    all_articles = []
+    for src in rss_sources:   all_articles += fetch(src)
+    for src in api_sources:   all_articles += await fetch(src)
+
+    # 2. 去重
+    all_articles = dedup(all_articles)
+
+    # 3. 过滤 —— 先关键词后 LLM
+    filtered = keyword_filter(all_articles)
+    filtered += await llm_filter(filtered)
+
+    # 4. 摘要 —— 每篇调一次 LLM
+    processed = [await summarize(a) for a in filtered]
+
+    # 5. QA
+    passed = qa_check(processed)
+
+    # 6. 适配 + 发布
+    adapted = blog_adapter.adapt(passed)
+    count = publisher.publish(adapted)</pre>
+
+  <p>代码的实际写法比这略复杂（有错误处理、统计日志等），但核心骨架就是这样。</p>
+
+  <!-- ============================================================ -->
+  <h2>6. 验证理解</h2>
+
+  <p>如果能回答这些问题，说明你理解了 Pipeline 的核心：</p>
+
+  <ol>
+    <li>为什么需要先关键词过滤再 LLM 过滤，顺序反了会发生什么？</li>
+    <li>Pipeline 最终输出的是什么文件？放到哪个目录？</li>
+    <li>如果某天 DeepSeek API 不稳定、请求超时了，管道会直接崩溃吗？（提示：看 try/except）</li>
+    <li>如果我想增加一个新新闻源（比如新增一个 RSS 源），需要改 Python 代码吗？</li>
+    <li>数据模型中的 <code>RawArticle</code> 和 <code>ProcessedArticle</code> 有什么区别？</li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2>7. 阅读指南：Pipeline 的文件地图</h2>
+
+  <table>
+    <tr><th>优先级</th><th>文件</th><th>为什么读它</th></tr>
+    <tr>
+      <td>⭐⭐⭐</td>
+      <td><code>pipeline/src/main.py</code></td>
+      <td>管道总编排，理解数据流入口</td>
+    </tr>
+    <tr>
+      <td>⭐⭐⭐</td>
+      <td><code>pipeline/src/models.py</code></td>
+      <td>三种数据形态，看懂数据类型就懂了一半</td>
+    </tr>
+    <tr>
+      <td>⭐⭐</td>
+      <td><code>pipeline/src/gather/rss_collector.py</code></td>
+      <td>RSS 采集最常用，150 行代码，注释齐全</td>
+    </tr>
+    <tr>
+      <td>⭐⭐</td>
+      <td><code>pipeline/src/filter/classifier.py</code></td>
+      <td>理解关键词过滤的 AI_KEYWORDS 列表</td>
+    </tr>
+    <tr>
+      <td>⭐</td>
+      <td><code>pipeline/src/summarize/prompt.py</code></td>
+      <td>LLM 提示词，想看怎么"教" AI 写摘要时读这里</td>
+    </tr>
+    <tr>
+      <td>⭐</td>
+      <td><code>pipeline/config.yaml</code></td>
+      <td>所有可调参数，经常改它</td>
+    </tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2>8. 推荐阅读</h2>
+
+  <ul>
+    <li><a href="https://github.com/heripo-lab/llm-newsletter-kit-core" target="_blank">llm-newsletter-kit-core</a> — 开源 AI 新闻通讯工具包，本项目的灵感来源之一</li>
+    <li><a href="https://platform.deepseek.com/api-docs" target="_blank">DeepSeek API 文档</a> — 了解 API 的请求/响应格式</li>
+    <li><a href="https://docs.pydantic.dev/" target="_blank">Pydantic 文档</a> — 数据模型库，<code>models.py</code> 用的就是它</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <div class="lesson-footer">
+    <p>下一课预告：Hugo 模板系统 — Go Template 语法和布局结构</p>
+    <p>有什么不清楚的，直接问我 👨‍🏫</p>
+  </div>
+
+</div>
+</body>
+</html>

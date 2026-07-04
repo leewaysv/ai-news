@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 3：Hugo 的工作过程 — md + 模板 = 网页 — AI News 教学</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<div class="lesson">
+
+  <h1>⚡ Hugo 的工作过程：<br>.md + 模板 = 网页</h1>
+  <div class="lesson-meta">
+    Lesson 3 · 预计阅读：15 分钟 · 难度：入门 · 关联：<a href="../reference/glossary.html">术语表</a>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>1. Hugo 的核心公式</h2>
+
+  <p>Hugo 做的事可以浓缩成一个公式：</p>
+
+  <div class="diagram">   .md 文件（内容）   +   Go 模板（布局）   =   完整的 HTML 网页
+        │                       │                       │
+    content/ 目录           layouts/ 目录            public/ 目录
+  （文章、页面）          （骨架 + 样式）            （最终网站）</div>
+
+  <p>这就是<b>静态站点生成器</b>的本质。它不是在用户访问时才拼装页面——而是在"构建"时就把所有页面提前生成好。用户访问时直接拿到现成的 HTML，所以速度飞快。</p>
+
+  <div class="callout">
+    <div class="callout-title">🔑 一句话记住 Hugo</div>
+    <p><b>内容（.md） + 模板（HTML） → 网站（public/）</b></p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>2. .md 文件里有什么</h2>
+
+  <p>打开 <code>blog/content/articles/</code> 目录下任何一个 .md 文件，你会看到两部分：</p>
+
+<pre>---
+title: "[EN] OpenAI 预览 GPT-5.6 Sol..."
+date: "2026-07-04T06:39:03+08:00"
+categories:
+  - AI 技术
+tags:
+  - OpenAI
+  - GPT-5.6 Sol
+summary: "OpenAI 发布了下一代模型..."
+aigc: true
+---
+← 这是 frontmatter（元数据）
+
+OpenAI 发布了下一代模型 GPT-5.6 Sol 的预览...
+← 这是正文（Markdown）</pre>
+
+  <table>
+    <tr><th>部分</th><th>叫什么</th><th>作用</th></tr>
+    <tr><td><code>---</code> 之间的内容</td><td><b>Frontmatter</b></td><td>文章的元数据（标题、日期、分类等）。模板用 <code>.Title</code>、<code>.Date</code>、<code>.Params.summary</code> 来读取这些字段。</td></tr>
+    <tr><td><code>---</code> 下面的内容</td><td><b>正文（Body）</b></td><td>文章的实际内容，Markdown 格式。模板里用 <code>.Content</code> 输出。</td></tr>
+  </table>
+
+  <div class="callout">
+    <div class="callout-title">💡 Frontmatter 的真相</div>
+    <p>Frontmatter 就是一篇"写给 Hugo 看的文章简介"。它告诉 Hugo：这篇文章的标题是什么、什么时候发布的、属于什么分类。模板根据这些信息来决定怎么展示。Template 中 <code>.Title</code> 读的就是 frontmatter 里的 title 字段，<code>.Params.summary</code> 读的是 summary 字段——<code>.Params</code> 是"任意自定义字段"的统称。</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>3. 模板里有什么</h2>
+
+  <p>打开 <code>blog/layouts/_default/single.html</code>：</p>
+
+<pre>&#123;&#123; define "main" }}
+&lt;article&gt;
+  &lt;h1&gt;&#123;&#123; .Title }}&lt;/h1&gt;              ← 输出文章标题
+  &lt;time&gt;&#123;&#123; .Date.Format "2006-01-02" }}&lt;/time&gt;  ← 输出日期
+  &#123;&#123; if .Params.aigc }}
+    &lt;span&gt;AI 辅助生成&lt;/span&gt;         ← 只有 aigc=true 才显示
+  &#123;&#123; end }}
+  &lt;div&gt;&#123;&#123; .Content }}&lt;/div&gt;         ← 输出正文（Markdown 转 HTML）
+&#123;&#123; end }}</pre>
+
+  <p>这里 <code>&#123;&#123; .Title }}</code>、<code>&#123;&#123; .Content }}</code> 这些就是 <b>Go Template 标签</b>——它们是 Hugo 的"占位符"。</p>
+
+  <table>
+    <tr><th>模板标签</th><th>读取的位置</th><th>示例值</th></tr>
+    <tr><td><code>&#123;&#123; .Title }}</code></td><td>当前页面的 frontmatter title</td><td>"[EN] OpenAI 预览 GPT-5.6 Sol..."</td></tr>
+    <tr><td><code>&#123;&#123; .Content }}</code></td><td>当前页面的 Markdown 正文（已转 HTML）</td><td>&lt;p&gt;OpenAI 发布了...&lt;/p&gt;</td></tr>
+    <tr><td><code>&#123;&#123; .Date }}</code></td><td>frontmatter 中的 date</td><td>2026-07-04</td></tr>
+    <tr><td><code>&#123;&#123; .Params.summary }}</code></td><td>frontmatter 中的自定义字段 summary</td><td>"OpenAI 发布了..."</td></tr>
+    <tr><td><code>&#123;&#123; .Site.Title }}</code></td><td>站点配置（hugo.toml）中的 title</td><td>"AI 早报"</td></tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2>4. 合并过程：Hugo 怎么决定用哪个模板？</h2>
+
+  <p>Hugo 有一套<b>模板查找规则</b>（Lookup Order）。对于一篇文章（叫 single page），它会按这个顺序找模板：</p>
+
+  <div class="diagram">   layouts/              ← Hugo 先看 layouts/ 目录
+     ├── _default/
+     │   ├── baseof.html  ← 这是"骨架"
+     │   └── single.html  ← 这是"填充物"
+     ├── index.html       ← 首页模板
+     └── 404.html         ← 404 页面</div>
+
+  <p><b>查找逻辑：</b></p>
+  <ol>
+    <li>Hugo 读取 .md 文件，确定页面类型（这是"单页" single page）</li>
+    <li>Hugo 去 <code>layouts/</code> 里找 <code>single.html</code></li>
+    <li>找到 <code>layouts/_default/single.html</code>，用它来渲染内容</li>
+    <li><code>baseof.html</code> 会被自动作为"外层骨架"包裹进来</li>
+  </ol>
+
+  <h3>baseof.html 和 single.html 怎么配合？</h3>
+
+  <p>这是 Hugo 模板系统中最重要的关系：</p>
+
+  <div class="diagram">   baseof.html（骨架）              single.html（填充）
+  ┌──────────────────────┐       ┌──────────────────────┐
+  │ &lt;html&gt;               │       │ &#123;&#123; define "main" }}   │
+  │   &lt;head&gt;...&lt;/head&gt;    │       │   &lt;h1&gt;.Title&lt;/h1&gt;     │
+  │   &lt;body&gt;             │       │   .Content            │
+  │     &#123;&#123; block "main" . }}  │ ← ─ ─ │   ...                  │
+  │     &#123;&#123; end }}          │       │ &#123;&#123; end }}             │
+  │   &lt;/body&gt;             │       └──────────────────────┘
+  │ &lt;/html&gt;              │
+  └──────────────────────┘</div>
+
+  <p><code>baseof.html</code> 里定义了一个"插槽"：<code>&#123;&#123; block "main" . }}...&#123;&#123; end }}</code>。</p>
+  <p><code>single.html</code> 里用 <code>&#123;&#123; define "main" }}...&#123;&#123; end }}</code> 填充这个插槽。</p>
+  <p><b>最终结果</b>：Hugo 把 single.html 的内容"塞进" baseof.html 的插槽位置，合成一个完整的页面。</p>
+
+  <div class="callout">
+    <div class="callout-title">🎯 类比：就像"相框 + 照片"</div>
+    <p><code>baseof.html</code> 是相框——每个页面都一样的外框（header、footer、css）。<code>single.html</code> 是照片——每篇文章不同的内容。Hugo 的工作就是选择合适的照片放进相框里。</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>5. 两种页面类型：List vs Single</h2>
+
+  <p>Hugo 把页面分成两大类：</p>
+
+  <table>
+    <tr><th>类型</th><th>模板</th><th>做什么用</th><th>.Pages</th></tr>
+    <tr>
+      <td><b>List</b>（列表页）</td>
+      <td><code>list.html</code></td>
+      <td>显示一组文章的概览（首页、分类页、标签页）</td>
+      <td>有（多篇文章）</td>
+    </tr>
+    <tr>
+      <td><b>Single</b>（单页）</td>
+      <td><code>single.html</code></td>
+      <td>显示一篇文章的完整内容</td>
+      <td>没有（只有自身）</td>
+    </tr>
+  </table>
+
+  <p><b>首页</b>是一个特殊的列表页，它的模板是 <code>layouts/index.html</code>。在我们的项目中，首页按日期分组显示所有文章。</p>
+
+  <!-- ============================================================ -->
+  <h2>6. 到底怎么合并——以这篇文章为例</h2>
+
+  <p>当用户访问 <code>/articles/en-openai-gpt-56-sol/</code> 时，Hugo 的构建过程：</p>
+
+  <div class="diagram">   ┌─────────────────────────────────────────────────────┐
+   │  Step 1：读取 .md 文件                              │
+   │  /content/articles/2026-07-04-en-openai-gpt-56-sol.md │
+   │  提取 frontmatter + Markdown 正文                    │
+   └──────────────────────┬──────────────────────────────┘
+                          ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Step 2：选择模板                                    │
+   │  类型 = single → 找 _default/single.html             │
+   │  有 baseof.html → 作为骨架                           │
+   └──────────────────────┬──────────────────────────────┘
+                          ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Step 3：合并渲染                                    │
+   │                                                      │
+   │  .Title     → "[EN] OpenAI 预览 GPT-5.6 Sol..."      │
+   │  .Content   → Markdown → HTML（标题、段落、列表）    │
+   │  .Date      → "2026-07-04T06:39:03+08:00"           │
+   │  .Params.aigc → true → 显示"AI 辅助生成"标签        │
+   │  .Params.source → "OpenAI Blog"                     │
+   │                                                      │
+   └──────────────────────┬──────────────────────────────┘
+                          ▼
+   ┌─────────────────────────────────────────────────────┐
+   │  Step 4：输出到 /public/articles/en-openai-gpt-56-sol/ │
+   │  index.html — 完整的 HTML 页面                       │
+   └─────────────────────────────────────────────────────┘</div>
+
+  <h3>实际生成的 HTML 长什么样</h3>
+
+  <p><code>&#123;&#123; .Title }}</code> 变成：</p>
+<pre>&lt;h1 class="text-3xl font-bold text-gray-900 dark:text-white leading-tight"&gt;
+  [EN] OpenAI 预览 GPT-5.6 Sol：新一代模型强化编程、科学与网络安全能力
+&lt;/h1&gt;</pre>
+
+  <p><code>&#123;&#123; if .Params.aigc }}</code> 变成：</p>
+<pre>&lt;span class="tag"&gt;AI 辅助生成&lt;/span&gt;</pre>
+
+  <p><code>&#123;&#123; .Content }}</code> 变成：</p>
+<pre>&lt;h2&gt;关键要点&lt;/h2&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;strong&gt;GPT-5.6 Sol 在编程、科学和网络安全三大关键领域能力显著提升。&lt;/strong&gt;&lt;/li&gt;
+  ...
+&lt;/ul&gt;</pre>
+
+  <p>最终，所有这些 HTML 片段被组合到 <code>baseof.html</code> 的骨架里，成为一个完整的页面。</p>
+
+  <!-- ============================================================ -->
+  <h2>7. .md 文件在构建时才读取</h2>
+
+  <p>这一点很重要：</p>
+
+  <ul>
+    <li>你在 <code>content/articles/</code> 里放一个新的 .md 文件，Hugo 并不会立刻知道</li>
+    <li>你必须<b>重新构建</b>（执行 <code>hugo</code> 命令），Hugo 才会读取它</li>
+    <li>构建 → 输出新的 public/ → 部署上线</li>
+  </ul>
+
+  <p>在我们的系统中，Pipeline 生成 .md 后自动 commit → 触发 Cloudflare Pages 重新构建和部署。所以最终效果就像"实时更新"一样。</p>
+
+  <!-- ============================================================ -->
+  <h2>8. 验证理解</h2>
+
+  <ol>
+    <li>如果我想在文章详情页显示"来源网站"的图标，我需要改哪个模板文件？</li>
+    <li><code>baseof.html</code> 和 <code>single.html</code> 的关系是什么？</li>
+    <li>如果我把一篇 .md 的 <code>aigc: true</code> 改成 <code>aigc: false</code>，会发生什么？</li>
+    <li>首页 <code>index.html</code> 是 List 还是 Single 类型？它怎么获得文章列表的？</li>
+    <li>Pipeline 生成 .md 后，为什么不能立刻在浏览器看到新文章？（提示：缺少了哪一步？）</li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2>9. 实际操作建议</h2>
+
+  <p>如果你想让博客更漂亮，想改布局，从这些地方入手：</p>
+
+  <table>
+    <tr><th>你想改什么</th><th>改哪个文件</th><th>改动示例</th></tr>
+    <tr>
+      <td>导航栏的链接</td>
+      <td><code>config/_default/menus.toml</code></td>
+      <td>增删菜单项，改链接地址</td>
+    </tr>
+    <tr>
+      <td>每一篇文章卡片的样式</td>
+      <td><code>layouts/partials/article-card.html</code></td>
+      <td>调整 HTML 结构或 Tailwind 类名</td>
+    </tr>
+    <tr>
+      <td>文章页的页脚（显示上一篇/下一篇）</td>
+      <td><code>layouts/_default/single.html</code></td>
+      <td>在末尾加 <code>&#123;&#123; if .Next }}{{ end }}</code> 等</td>
+    </tr>
+    <tr>
+      <td>全站的版权信息和社交链接</td>
+      <td><code>layouts/partials/footer.html</code></td>
+      <td>改 HTML 内容</td>
+    </tr>
+    <tr>
+      <td>站点名称"AI 早报"</td>
+      <td><code>config/_default/hugo.toml</code></td>
+      <td>改 title 字段</td>
+    </tr>
+    <tr>
+      <td>全站字体和颜色</td>
+      <td><code>assets/css/main.css</code></td>
+      <td>改 Tailwind 样式</td>
+    </tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2>10. 推荐阅读</h2>
+
+  <ul>
+    <li><a href="https://gohugo.io/templates/introduction/" target="_blank">Hugo 模板介绍</a> — 官方文档，最权威</li>
+    <li><a href="https://gohugo.io/templates/lookup-order/" target="_blank">Hugo 模板查找顺序</a> — 深入理解 Hugo 怎么选模板</li>
+    <li><a href="https://gohugo.io/content-management/front-matter/" target="_blank">Hugo Frontmatter</a> — 所有支持的 frontmatter 字段</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <div class="lesson-footer">
+    <p>你现在已经理解了 Hugo 的核心工作流程。下一课可以深入到 <b>Go Template 语法详解</b>——怎么用 <code>&#123;&#123; range }}</code> 遍历文章列表、<code>&#123;&#123; with }}</code> 条件判断、管道函数等。</p>
+    <p>或者如果你有其他想学的方向，告诉我！</p>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 1：技术栈全景 — AI News 教学</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<div class="lesson">
+
+  <h1>🗺️ 技术栈全景：理解整个系统</h1>
+  <div class="lesson-meta">
+    Lesson 1 · 预计阅读：10 分钟 · 难度：入门
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 第一部分：系统分层 -->
+  <!-- ============================================================ -->
+  <h2>1. 三个层次</h2>
+
+  <p>这个系统由三层组成，每层解决一个不同的问题。把它们想象成一家<b>新闻编辑室</b>：</p>
+
+  <table>
+    <tr>
+      <th>层次</th>
+      <th>类比</th>
+      <th>技术</th>
+      <th>职责</th>
+    </tr>
+    <tr>
+      <td><strong>Pipeline</strong></td>
+      <td>记者 + 编辑</td>
+      <td>Python 脚本</td>
+      <td>搜集新闻、筛选、写稿</td>
+    </tr>
+    <tr>
+      <td><strong>Blog</strong></td>
+      <td>排版工</td>
+      <td>Hugo + Go 模板</td>
+      <td>把稿件排版成网页</td>
+    </tr>
+    <tr>
+      <td><strong>Infrastructure</strong></td>
+      <td>发行部</td>
+      <td>GitHub Actions + Cloudflare</td>
+      <td>定时发布 + 分发</td>
+    </tr>
+  </table>
+
+  <div class="callout">
+    <div class="callout-title">💡 先看宏观再深入细节</div>
+    <p>如果你现在对各层具体怎么工作还不清楚，没关系。这节课的目标是让你在脑子里构建一张<b>地图</b>——以后深入每一层时，你都知道它在地图上的位置。</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 第二部分：数据流 -->
+  <!-- ============================================================ -->
+  <h2>2. 数据流：从新闻源到你的浏览器</h2>
+
+  <p>每天早上，一条生产线自动运转。这是完整的数据流：</p>
+
+  <div class="diagram">┌─────────────────────────────────────────────────────┐
+│               Pipeline（Python）                     │
+│                                                      │
+│  RSS/API 🌐 → 预过滤 🔍 → LLM 摘要 🧠 → QA 校验 ✅  │
+│                                                      │
+└──────────────────────┬──────────────────────────────┘
+                       │ 生成 .md 文件
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│               Blog（Hugo）                           │
+│                                                      │
+│  .md 文件 → Hugo 构建 → HTML + CSS                   │
+│                                                      │
+└──────────────────────┬──────────────────────────────┘
+                       │ 触发部署
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│          Infrastructure（CI/CD + Hosting）            │
+│                                                      │
+│  GitHub Actions → Hugo Build → Cloudflare Pages      │
+│                                                      │
+└─────────────────────────────────────────────────────┘
+                       │
+                       ▼
+             你在浏览器看到的早报 🎉</div>
+
+  <p>这个流程完全自动。你不需要每天早上手动操作什么——管道在 GitHub 上定时触发，走完整个链条。</p>
+
+  <!-- ============================================================ -->
+  <!-- 第三部分：各技术详解 -->
+  <!-- ============================================================ -->
+  <h2>3. 每一层用什么技术？</h2>
+
+  <h3>3.1 Pipeline 层 — Python 脚本</h3>
+
+  <p>Pipeline 是一个 Python 程序，你的项目里在 <code>pipeline/</code> 目录下。它做这些事：</p>
+
+  <table>
+    <tr><th>模块</th><th>做什么</th><th>关键文件</th></tr>
+    <tr>
+      <td><code>gather/</code></td>
+      <td>从 RSS、API、网页抓取新闻</td>
+      <td><code>rss_collector.py</code></td>
+    </tr>
+    <tr>
+      <td><code>filter/</code></td>
+      <td>判断文章是否和 AI 相关</td>
+      <td><code>classifier.py</code></td>
+    </tr>
+    <tr>
+      <td><code>summarize/</code></td>
+      <td>调用 DeepSeek API 生成中文摘要</td>
+      <td><code>summarizer.py</code></td>
+    </tr>
+    <tr>
+      <td><code>qa/</code></td>
+      <td>检查摘要质量</td>
+      <td><code>embedding_check.py</code></td>
+    </tr>
+    <tr>
+      <td><code>adapt/</code></td>
+      <td>转成 Hugo 认识的 .md 格式</td>
+      <td><code>blog_adapter.py</code></td>
+    </tr>
+  </table>
+
+  <h3>3.2 Blog 层 — Hugo</h3>
+
+  <p>Hugo 是一个<b>静态站点生成器</b>。它不是给你一个"后台管理界面"去一篇文章一篇文章地编辑——</p>
+
+  <p>它的工作方式是：</p>
+  <ol>
+    <li>你在 <code>content/</code> 目录放 .md 文件</li>
+    <li>你在 <code>layouts/</code> 目录写 HTML <b>模板</b></li>
+    <li>你执行 <code>hugo</code> 命令</li>
+    <li>Hugo 把 .md + 模板 合并成最终的 HTML 文件</li>
+    <li>这些 HTML 就是你的网站</li>
+  </ol>
+
+  <div class="callout">
+    <div class="callout-title">🔑 关键概念：构建</div>
+    <p>"构建"就是执行 <code>hugo --gc --minify</code> 这个命令。它把 .md 和模板"编译"成 HTML。Pipeline 生成 .md 后，必须触发一次构建，新文章才能上线。这个过程完全自动——你不需要手动跑任何命令。</p>
+  </div>
+
+  <h3>3.3 Infrastructure 层 — CI/CD</h3>
+
+  <table>
+    <tr><th>组件</th><th>角色</th></tr>
+    <tr><td><b>GitHub Actions</b></td><td>每天早上 06:00 自动运行 Pipeline</td></tr>
+    <tr><td><b>Git</b></td><td>存储所有代码和文章 .md 文件</td></tr>
+    <tr><td><b>Cloudflare Pages</b></td><td>托管网站，CDN 加速</td></tr>
+    <tr><td><b>Vercel (备选)</b></td><td>另一个托管选项</td></tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <!-- 第四部分：你在项目中看到的文件 -->
+  <!-- ============================================================ -->
+  <h2>4. 项目目录结构对照</h2>
+
+  <p>你看到过这些目录，现在你知道它们对应哪一层了：</p>
+
+  <table>
+    <tr><th>目录</th><th>层</th><th>内容</th></tr>
+    <tr><td><code>pipeline/</code></td><td>Pipeline</td><td>Python 脚本 + 配置文件</td></tr>
+    <tr><td><code>blog/</code></td><td>Blog</td><td>Hugo 站点 + 模板 + 内容</td></tr>
+    <tr><td><code>blog/content/</code></td><td>Blog</td><td>Pipeline 生成的 .md 文件（文章）</td></tr>
+    <tr><td><code>blog/layouts/</code></td><td>Blog</td><td>Go 模板（控制页面长什么样）</td></tr>
+    <tr><td><code>blog/assets/</code></td><td>Blog</td><td>CSS、JS 等前端资源</td></tr>
+    <tr><td><code>.github/workflows/</code></td><td>Infrastructure</td><td>GitHub Actions 配置文件</td></tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <!-- 第五部分：阅读理解 -->
+  <!-- ============================================================ -->
+  <h2>5. 验证你的理解</h2>
+
+  <p>试着在脑子里回答这几个问题。如果答不上来，回头看上面的内容：</p>
+
+  <ol>
+    <li>Pipeline 生成的 .md 文件最终去了哪里？</li>
+    <li>Hugo 的"构建"是什么意思？谁触发它？</li>
+    <li>为什么这个系统每天能自动发早报，不需要你手动操作？</li>
+    <li>如果 DeepSeek API 调用失败了，哪一层会报错？</li>
+    <li>Tailwind CSS 在哪个目录？它在项目的哪一层？</li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <!-- 第六部分：资源 -->
+  <!-- ============================================================ -->
+  <h2>6. 进一步阅读</h2>
+
+  <ul>
+    <li><a href="https://gohugo.io/documentation/" target="_blank">Hugo 官方文档</a></li>
+    <li><a href="https://tailwindcss.com/docs" target="_blank">Tailwind CSS 文档</a></li>
+    <li><a href="https://docs.github.com/en/actions" target="_blank">GitHub Actions 文档</a></li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <!-- Footer -->
+  <!-- ============================================================ -->
+  <div class="lesson-footer">
+    <p>这节课建立了整体的技术栈地图。后续课程会深入每一层的具体运作。</p>
+    <p>有任何不清楚的地方，随时问我 👨‍🏫</p>
+  </div>
+
+</div>
+</body>
+</html>

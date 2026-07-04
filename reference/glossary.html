@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>术语表 — AI News 技术栈</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+  <style>
+    dt { font-weight: 600; margin-top: 1rem; color: var(--color-primary); }
+    dd { margin-left: 0; margin-top: 0.25rem; color: var(--color-text-secondary); }
+  </style>
+</head>
+<body>
+<div class="lesson">
+
+  <h1>📖 技术栈术语表</h1>
+  <div class="lesson-meta">快速查阅 · 按字母排序</div>
+
+  <dl>
+
+    <dt>API</dt>
+    <dd>应用程序接口。本项目中 Pipeline 通过 API 调用 DeepSeek 的 LLM 服务来生成摘要。</dd>
+
+    <dt>AIGC</dt>
+    <dd>AI Generated Content，AI 生成内容。本项目每篇文章底部标注"AI 辅助生成"以满足合规要求。</dd>
+
+    <dt>Build（构建）</dt>
+    <dd>Hugo 把 .md 文件 + HTML 模板"编译"成最终网站的 HTML 文件的过程。命令：<code>hugo --gc --minify</code>。</dd>
+
+    <dt>CDN</dt>
+    <dd>Content Delivery Network，内容分发网络。Cloudflare Pages 提供 CDN 加速，让全球读者都能快速访问。</dd>
+
+    <dt>CI/CD</dt>
+    <dd>持续集成/持续部署。本项目的 GitHub Actions 工作流：每天自动跑 Pipeline → 构建 Hugo → 部署到 Cloudflare。</dd>
+
+    <dt>Cloudflare Pages</dt>
+    <dd>静态站点托管平台。本项目博客最终部署的目标。免费版提供无限带宽。</dd>
+
+    <dt>Content Collection</dt>
+    <dd>Hugo 的概念（注意：本项目用的是 Hugo 标准版，不是 Astro）。Hugo 从 <code>content/</code> 目录读取 .md 文件生成页面。</dd>
+
+    <dt>CSS Pipes（Hugo Pipes）</dt>
+    <dd>Hugo 内置的资产处理机制。本项目用 Hugo Pipes + PostCSS 处理 Tailwind CSS。</dd>
+
+    <dt>DeepSeek API</dt>
+    <dd>本项目的 LLM 提供商（替代了最初的 Claude）。Pipeline 通过 OpenAI 兼容接口调用 DeepSeek 做新闻摘要和相关性判断。</dd>
+
+    <dt>Embedding</dt>
+    <dd>将文本转换为向量（数字数组）的技术。本项目用 sentence-transformers 做摘要与原文的相似度校验。</dd>
+
+    <dt>Frontmatter</dt>
+    <dd>.md 文件开头的 YAML 元数据区（两个 <code>---</code> 之间的内容）。Hugo 通过 frontmatter 获取文章的标题、日期、分类等信息。</dd>
+
+    <dt>GitHub Actions</dt>
+    <dd>GitHub 的 CI/CD 服务。本项目用它做两件事：每天早上 06:00 定时跑 Pipeline，以及提交代码时自动部署。</dd>
+
+    <dt>Go Template</dt>
+    <dd>Hugo 模板使用的模板语言。比如 <code>{{ .Title }}</code> 输出文章标题，<code>{{ range .Pages }}</code> 遍历文章列表。</dd>
+
+    <dt>Hugo</dt>
+    <dd>基于 Go 语言的静态站点生成器。速度极快，单二进制文件。本项目的博客框架。</dd>
+
+    <dt>LLM</dt>
+    <dd>Large Language Model，大语言模型。Pipeline 使用 DeepSeek（具体是 deepseek-chat）做新闻摘要和过滤器。</dd>
+
+    <dt>Markdown</dt>
+    <dd>轻量级标记语言。项目中的文章以 .md 格式存储，Hugo 将其渲染为 HTML 页面。</dd>
+
+    <dt>Pipeline</dt>
+    <dd>管道/流水线。本项目中指 <code>pipeline/</code> 目录下的 Python 程序：采集 → 过滤 → 摘要 → 发布。</dd>
+
+    <dt>PostCSS</dt>
+    <dd>CSS 后处理器。Hugo 用 PostCSS + Tailwind 插件来处理 CSS。</dd>
+
+    <dt>RSS</dt>
+    <dd>Really Simple Syndication，一种内容订阅格式。本项目的博客提供 <code>/feed.xml</code>，读者可以用 RSS 阅读器订阅。</dd>
+
+    <dt>Static Site Generator (SSG)</dt>
+    <dd>静态站点生成器。Hugo 就是一款 SSG——它在构建时生成所有页面，而不是用户访问时才动态生成。优点是速度快、成本低。</dd>
+
+    <dt>Tailwind CSS</dt>
+    <dd>工具类优先的 CSS 框架。本项目使用 Tailwind v4，通过 PostCSS 集成到 Hugo 中。</dd>
+
+    <dt>Venv（Virtual Environment）</dt>
+    <dd>Python 虚拟环境。本项目的 Python 依赖安装在 <code>pipeline/.venv/</code> 中。</dd>
+
+    <dt>YAML</dt>
+    <dd>一种配置文件格式。项目中多处使用：文章的 frontmatter、<code>config.yaml</code>（Pipeline 配置）、<code>hugo.toml</code>（站点配置）。</dd>
+
+  </dl>
+
+  <div class="lesson-footer">
+    <p>链接：<a href="../lessons/0001-tech-stack-overview.html">← 回 Lesson 1：技术栈全景</a></p>
+  </div>
+
+</div>
+</body>
+</html>

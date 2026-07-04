@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 4：Infrastructure 细节 — CI/CD 与部署 — AI News 教学</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<div class="lesson">
+
+  <h1>☁️ Infrastructure 细节：<br>CI/CD、Git、部署</h1>
+  <div class="lesson-meta">
+    Lesson 4 · 预计阅读：15 分钟 · 难度：入门 · 关联：<a href="../reference/glossary.html">术语表</a>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>1. Infrastructure 层回答三个问题</h2>
+
+  <p>前面两课介绍了 Pipeline（做内容）和 Hugo（做页面）。Infrastructure 层解决的是<b>怎么让这一切自动运转</b>的问题：</p>
+
+  <table>
+    <tr><th>问题</th><th>答案</th></tr>
+    <tr><td>谁每天定时启动 Pipeline？</td><td><b>GitHub Actions</b>（定时器）</td></tr>
+    <tr><td>谁把生成的 .md 提交到仓库？</td><td><b>Git</b>（Pipeline 自己 commit + push）</td></tr>
+    <tr><td>谁把 Hugo 构建的 HTML 放到网上？</td><td><b>Cloudflare Pages</b>（自动部署）</td></tr>
+  </table>
+
+  <div class="callout">
+    <div class="callout-title">🔑 Infrastructure = 无人值守自动化</div>
+    <p>Infrastructure 层的终极目标：你不需要每天登录服务器、不需要手动跑命令、不需要记"今天发早报了没"——系统自己完成一切。</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>2. 两条工作流</h2>
+
+  <p>项目中有两个 GitHub Actions 工作流文件，它们分别做不同的事：</p>
+
+  <div class="diagram">   工作流 1：daily-digest.yml          工作流 2：deploy-blog.yml
+   ┌──────────────────────────┐      ┌──────────────────────────┐
+   │ 触发：定时（每天 06:00） │      │ 触发：git push 到 main   │
+   │                          │      │                          │
+   │ 1. 签出代码              │      │ 1. 签出代码              │
+   │ 2. 装 Python 依赖        │      │ 2. 装 Hugo 和 Node       │
+   │ 3. 跑 Pipeline           │      │ 3. 跑 hugo --gc --minify │
+   │ 4. git commit + push     │      │ 4. 部署到 Cloudflare     │
+   │    生成的 .md            │      │    Pages                 │
+   └──────────┬───────────────┘      └──────────────────────────┘
+              │                                      │
+              │ git push（新增 .md 文件）              │
+              └──────────────────►────────────────────┘
+                             串联关系
+                     daily-digest → deploy-blog</div>
+
+  <div class="callout">
+    <div class="callout-title">🔗 两个工作流是串联的</div>
+    <p>它们不是同时跑的。时序是：① 06:00 daily-digest 跑完 → ② 它 commit .md 文件并 push → ③ push 事件触发 deploy-blog → ④ Hugo 构建 → ⑤ Cloudflare 部署上线。</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>3. GitHub Actions 是什么</h2>
+
+  <p>GitHub Actions 是 GitHub 自带的<b>自动化服务</b>。你可以把它理解成一台<b>免费的云电脑</b>，每次触发时它会：</p>
+
+  <ol>
+    <li>给你一台临时的 Ubuntu 服务器</li>
+    <li>按你写的步骤执行命令</li>
+    <li>执行完自动销毁</li>
+  </ol>
+
+  <p>你不需要自己买服务器、不需要维护操作系统——GitHub 全包了。免费版每个月有 <b>2000 分钟</b>的额度，对我们这个项目绰绰有余（每天跑一次，每次 3-5 分钟，月消耗不到 150 分钟）。</p>
+
+  <h3>工作流文件的骨架</h3>
+
+  <p>打开 <code>.github/workflows/daily-digest.yml</code>，它的结构是：</p>
+
+<pre>name: Daily AI Digest          ← 工作流名称（在 GitHub 页面上显示）
+
+on:                            ← 触发条件
+  schedule:                    ← 定时触发
+    - cron: '0 22 * * *'      ← UTC 时间 22:00 = 北京时间 06:00
+  workflow_dispatch:           ← 也支持手动触发
+
+jobs:                          ← 要干的事
+  digest:                      ← 任务名
+    runs-on: ubuntu-latest     ← 在 Ubuntu 上跑
+    steps:                     ← 步骤列表
+      - uses: actions/checkout@v4    ← 步骤1：签出你的代码
+      - name: Setup Python           ← 步骤2：装 Python
+      - name: Run pipeline           ← 步骤3：跑管道
+        env:                         ← 设置环境变量
+          API_KEY: ${{ secrets.XXX }} ← 从 GitHub Secrets 读取
+      - name: Commit articles        ← 步骤4：提交 .md 文件</pre>
+
+  <div class="callout">
+    <div class="callout-title">💡 workflow_dispatch 有什么用</div>
+    <p>这是一个重要的调试功能。加上 <code>workflow_dispatch</code> 后，你可以去 GitHub 仓库的 Actions 页面手动点"Run workflow"按钮——这样即使没到定时时间，也能立刻触发一次运行。测试管道改动时特别好用。</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>4. Secrete：API Key 放在哪里</h2>
+
+  <p>Pipeline 需要调用 DeepSeek API（需要一个密钥）。你不能把密钥直接写在代码里（任何人都能看到），而是存在 GitHub 的 <b>Secrets（密秘）</b> 中：</p>
+
+  <div class="diagram">   GitHub 仓库 → Settings → Secrets and variables → Actions
+                                 │
+                                 ▼
+                      ┌──────────────────────┐
+                      │  DEEPSEEK_API_KEY    │  ← 你在 GitHub 网页上设
+                      │  CF_API_TOKEN        │  ← Cloudflare 的 API 令牌
+                      │  CF_ACCOUNT_ID       │  ← Cloudflare 账号 ID
+                      └──────────────────────┘
+                                 │
+                                 ▼
+                      在工作流中通过语法引用：
+                      ${{ secrets.DEEPSEEK_API_KEY }}
+                      ${{ secrets.CF_API_TOKEN }}</pre>
+
+  <p>在本地开发时，密钥存在 <code>pipeline/.env</code> 文件里（已加入 .gitignore，不会提交到 GitHub）。</p>
+
+  <!-- ============================================================ -->
+  <h2>5. Cron 定时表达式</h2>
+
+  <p>你会在 <code>daily-digest.yml</code> 里看到 <code>cron: '0 22 * * *'</code>。这是 Linux 定时任务的格式：</p>
+
+<pre>┌───── 分钟 (0-59)
+│ ┌───── 小时 (0-23)
+│ │ ┌───── 日期 (1-31)
+│ │ │ ┌───── 月份 (1-12)
+│ │ │ │ ┌───── 星期 (0-7, 0=星期日)
+│ │ │ │ │
+0 22 * * *     ← 每天 UTC 22:00（北京时间 06:00）
+
+一些常用例子：
+0 6 * * *      ← 每天 UTC 6:00 = 北京时间 14:00
+*/30 * * * *   ← 每 30 分钟
+0 9 * * 1-5    ← 工作日早上 9 点</pre>
+
+  <div class="callout">
+    <div class="callout-title">⚠️ 时区陷阱</div>
+    <p>GitHub Actions 的 cron 使用 <b>UTC 时间</b>（世界标准时间）。北京时间 = UTC + 8 小时。所以"北京时间每天早上 6 点"要设成 <code>0 22 * * *</code>（22+8=6 第二天）。</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>6. Cloudflare Pages：网站的"家"</h2>
+
+  <p>Cloudflare Pages 是一个<b>静态站点托管服务</b>。它从你的 GitHub 仓库拉代码，自动构建 Hugo，然后把生成的 HTML 部署到全球 CDN 节点上。</p>
+
+  <p>工作方式：</p>
+
+  <div class="diagram">   你 git push 到 GitHub
+         │
+         ▼
+   Cloudflare Pages 检测到变更
+         │
+         ▼
+   拉取最新代码 → 执行 hugo --gc --minify
+         │
+         ▼
+   把 public/ 目录的内容同步到 CDN
+         │
+         ▼
+   全球节点生效，你的网站更新</div>
+
+  <p>免费版特性：</p>
+  <ul>
+    <li><b>无限带宽</b>——不像 Vercel 免费版有带宽限制</li>
+    <li><b>自动 HTTPS</b>——免费 TLS 证书</li>
+    <li><b>CDN 加速</b>——全球 200+ 节点</li>
+    <li>每月 <b>500 次构建</b>——我们一天一次，绰绰有余</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2>7. 数据流全景：从 06:00 到你在浏览器看到</h2>
+
+  <p>把所有环节串起来，完整的时序是这样的：</p>
+
+  <div class="diagram">   06:00 北京            GitHub Actions 启动 daily-digest
+         │
+         ▼
+   06:01                   Pipeline 开始采集新闻（RSS + API）
+         │
+         ▼
+   06:05                   Pipeline 完成摘要，生成 8 个 .md 文件
+         │
+         ▼
+   06:06                   Pipeline 自动 git commit + git push
+         │
+         ▼
+   06:06                   GitHub 检测到新 commit，触发 deploy-blog
+         │
+         ▼
+   06:07                   Cloudflare 拉代码 → hugo 构建 → 部署
+         │
+         ▼
+   06:08 ☕                你打开手机 → 看到今天的早报</pre>
+
+  <p>从 Pipeline 启动到网站更新，全程大约 <b>8 分钟</b>，不需要任何人工操作。</p>
+
+  <!-- ============================================================ -->
+  <h2>8. 部署博客有两种方式</h2>
+
+  <table>
+    <tr><th>方式</th><th>触发方式</th><th>适用场景</th></tr>
+    <tr>
+      <td><b>自动部署</b></td>
+      <td>你 git push 到 main 分支</td>
+      <td>平时改代码、改模板、改样式</td>
+    </tr>
+    <tr>
+      <td><b>手动触发（workflow_dispatch）</b></td>
+      <td>去 GitHub Actions 页面点按钮</td>
+      <td>调试部署、紧急修复、测试配置变更</td>
+    </tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2>9. 本地开发 vs 生产部署</h2>
+
+  <table>
+    <tr><th>环节</th><th>本地开发</th><th>生产部署</th></tr>
+    <tr>
+      <td>Pipeline</td>
+      <td>命令行跑 <code>python -m src.main</code></td>
+      <td>GitHub Actions 定时跑</td>
+    </tr>
+    <tr>
+      <td>Hugo</td>
+      <td><code>hugo server</code> 实时预览</td>
+      <td>Cloudflare Pages 自动构建</td>
+    </tr>
+    <tr>
+      <td>API Key</td>
+      <td><code>pipeline/.env</code> 文件中</td>
+      <td>GitHub Secrets 中</td>
+    </tr>
+    <tr>
+      <td>数据库</td>
+      <td>不需要</td>
+      <td>不需要（全静态文件）</td>
+    </tr>
+    <tr>
+      <td>文章 .md</td>
+      <td>Pipeline 写入本地 <code>content/</code></td>
+      <td>Pipeline 写入后 git push</td>
+    </tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2>10. 验证理解</h2>
+
+  <ol>
+    <li>daily-digest.yml 和 deploy-blog.yml 谁先执行？它们在什么环节串联？</li>
+    <li>如果 DeepSeek API key 过期了，你应该去哪里更新？</li>
+    <li>cron <code>'0 22 * * *'</code> 对应北京时间的什么时间？</li>
+    <li>如果 Pipeline 运行失败，GitHub 会通知你吗？怎么看日志？</li>
+    <li>修改 Hugo 模板后，需要做什么操作才能让网站更新？（提示：分本地开发和生产两种场景）</li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2>11. 推荐阅读</h2>
+
+  <ul>
+    <li><a href="https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions" target="_blank">GitHub Actions 工作流语法</a> — 完整的 YAML 语法参考</li>
+    <li><a href="https://developers.cloudflare.com/pages/" target="_blank">Cloudflare Pages 文档</a> — 部署、自定义域名、环境变量</li>
+    <li><a href="https://crontab.guru/" target="_blank">crontab.guru</a> — 在线 cron 表达式生成器</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <div class="lesson-footer">
+    <p>你现在已经理解了整个系统从代码到线上的完整链路。</p>
+    <p>下一课可以深入任一层：<b>Go Template 语法</b>、<b>Tailwind CSS 改样式</b>、或者<b>Pipeline 具体模块代码走读</b>——告诉我你想学哪个！</p>
+  </div>
+
+</div>
+</body>
+</html>

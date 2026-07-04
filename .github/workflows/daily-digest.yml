@@ -23,13 +23,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install httpx feedparser beautifulsoup4 lxml pyyaml pydantic pydantic-settings anthropic click
-          # sentence-transformers 可选，无 embedding 模型时 QA 检查默认通过
+          pip install httpx feedparser beautifulsoup4 lxml pyyaml pydantic pydantic-settings openai click
           pip install sentence-transformers numpy
 
       - name: Run pipeline
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: python -m src.main
 
       - name: Commit articles
