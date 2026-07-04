@@ -55,21 +55,40 @@ class Pipeline:
         self.labeler = AIGCLabeler()
 
     async def _llm_call(self, prompt: str, model: str = "main") -> str:
-        """LLM 调用封装"""
+        """LLM 调用封装（支持 OpenAI 兼容接口 / Anthropic）"""
         model_id = (
             self.config.llm.model
             if model == "main"
             else self.config.llm.cheap_model
         )
+        key = self.config.get_api_key()
+        if not key:
+            raise ValueError("API key not configured")
 
-        if self.llm_client is None:
-            import anthropic
-            key = self.config.get_api_key()
-            if not key:
-                raise ValueError("ANTHROPIC_API_KEY not configured")
-            self.llm_client = anthropic.AsyncAnthropic(api_key=key)
+        if self.config.llm.provider == "anthropic":
+            return await self._call_anthropic(prompt, model_id, key)
+        else:
+            return await self._call_openai(prompt, model_id, key)
 
-        response = await self.llm_client.messages.create(
+    async def _call_openai(self, prompt: str, model_id: str, key: str) -> str:
+        """调用 OpenAI 兼容接口（DeepSeek 等）"""
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(
+            api_key=key,
+            base_url=self.config.llm.base_url,
+        )
+        response = await client.chat.completions.create(
+            model=model_id,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=self.config.llm.max_tokens,
+        )
+        return response.choices[0].message.content or ""
+
+    async def _call_anthropic(self, prompt: str, model_id: str, key: str) -> str:
+        """调用 Anthropic Claude API"""
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=key)
+        response = await client.messages.create(
             model=model_id,
             max_tokens=self.config.llm.max_tokens,
             messages=[{"role": "user", "content": prompt}],
@@ -83,7 +102,7 @@ class Pipeline:
             self.config.pipeline.source_weights.get("default", 5),
         )
 
-    async def run(self) -> int:
+    async def run(self, dry_run: bool = False) -> int:
         """执行单次管道运行"""
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         log.info(f"=== AI News Pipeline — {date_str} ===")
@@ -132,6 +151,12 @@ class Pipeline:
         zh_candidates = [a for a in filtered if a.lang == "zh"]
         filtered = zh_candidates + en_filtered
         log.info(f"  After filter: {len(filtered)}")
+
+        if dry_run:
+            log.info(f"[DRY-RUN] Stopping after filter. Would summarize {len(filtered)} articles.")
+            for a in filtered[:5]:
+                log.info(f"  → {a.source_name}: {a.title[:80]}")
+            return len(filtered)
 
         if not filtered:
             log.warning("No articles after filter — skipping today")
@@ -205,12 +230,12 @@ def cli(config: str, dry_run: bool):
     cfg = AppConfig.load(config)
 
     if not cfg.get_api_key():
-        click.echo("ERROR: ANTHROPIC_API_KEY not set", err=True)
-        click.echo("Set it via: export ANTHROPIC_API_KEY=sk-...", err=True)
+        click.echo("ERROR: LLM API key not set", err=True)
+        click.echo(f"Set it via: export DEEPSEEK_API_KEY=sk-... (provider: {cfg.llm.provider})", err=True)
         raise SystemExit(1)
 
     pipeline = Pipeline(cfg)
-    count = asyncio.run(pipeline.run())
+    count = asyncio.run(pipeline.run(dry_run=dry_run))
     click.echo(f"\nPublished {count} articles.")
 
 

@@ -4,39 +4,39 @@
 
 # ------ 模型配置 ------
 llm:
-  # Claude API
-  api_key: "${ANTHROPIC_API_KEY}"     # 从环境变量读取
-  model: "claude-sonnet-5-20251001"    # 摘要用模型
-  cheap_model: "claude-haiku-4-5-20251001"  # 预过滤用模型
+  provider: "openai"                     # openai | anthropic
+  api_key: "${DEEPSEEK_API_KEY}"
+  base_url: "https://api.deepseek.com"   # OpenAI 兼容接口地址
+  model: "deepseek-chat"                 # 摘要用模型
+  cheap_model: "deepseek-chat"           # 预过滤用模型
   max_tokens: 4096
 
 embedding:
-  model: "all-MiniLM-L6-v2"           # 本地 embedding 模型
-  threshold: 0.75                      # 相似度阈值（低于此值丢弃）
+  model: "all-MiniLM-L6-v2"
+  threshold: 0.75
 
 # ------ 管道配置 ------
 pipeline:
   timezone: "Asia/Shanghai"
   output_dir: "../blog/content/articles"
   max_articles_per_digest: 8
-  min_articles_to_publish: 3           # 低于此数量则跳过当天
+  min_articles_to_publish: 3
   source_weights:
-    openai: 10
-    google: 9
-    meta: 9
+    openai-blog: 10
+    google-ai: 9
+    meta-ai: 9
     deepmind: 9
     anthropic: 9
-    techcrunch: 7
-    theverge: 7
-    mit: 8
+    techcrunch-ai: 7
+    theverge-ai: 7
+    mit-news: 8
     huggingface: 8
-    arxiv: 6
-    github: 6
+    hackernews: 6
+    github-trending: 6
     default: 5
 
 # ------ 新闻源 ------
 news_sources:
-  # ---- 英文 RSS ----
   - id: openai-blog
     name: "OpenAI Blog"
     type: rss
@@ -100,7 +100,6 @@ news_sources:
     lang: en
     categories: ["industry", "policy"]
 
-  # ---- 英文 API ----
   - id: hackernews
     name: "Hacker News"
     type: api
@@ -115,7 +114,6 @@ news_sources:
     lang: en
     categories: ["open-source", "tools"]
 
-  # ---- 中文源 ----
   - id: jiqizhixin
     name: "机器之心"
     type: scrape

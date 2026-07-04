@@ -1,17 +1,44 @@
 """Pipeline 配置管理"""
 
+import os
+import re
 from pathlib import Path
 from typing import Optional
 
 import yaml
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _load_env(env_path: str = ".env") -> None:
+    """加载 .env 文件到环境变量"""
+    path = Path(env_path)
+    if not path.exists():
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key, val = key.strip(), val.strip().strip("\"'")
+            if key and not os.environ.get(key):
+                os.environ[key] = val
+
+
+def _resolve_env_vars(value: str) -> str:
+    """将字符串中的 ${VAR} 替换为环境变量值"""
+    def _replace(m):
+        var_name = m.group(1)
+        return os.environ.get(var_name, m.group(0))
+    return re.sub(r"\$\{(\w+)\}", _replace, value)
 
 
 class LLMConfig(BaseModel):
+    provider: str = "openai"
     api_key: str = ""
-    model: str = "claude-sonnet-5-20251001"
-    cheap_model: str = "claude-haiku-4-5-20251001"
+    base_url: str = "https://api.deepseek.com"
+    model: str = "deepseek-chat"
+    cheap_model: str = "deepseek-chat"
     max_tokens: int = 4096
 
 
@@ -39,24 +66,20 @@ class NewsSourceConfig(BaseModel):
     weight: int = 5
 
 
-class AppConfig(BaseSettings):
+class AppConfig(BaseModel):
     """合并文件配置 + 环境变量"""
-    model_config = SettingsConfigDict(
-        env_prefix="AI_NEWS_",
-        env_file=".env",
-        extra="ignore",
-    )
 
     llm: LLMConfig = LLMConfig()
     embedding: EmbeddingConfig = EmbeddingConfig()
     pipeline: PipelineConfig = PipelineConfig()
     news_sources: list[NewsSourceConfig] = Field(default_factory=list)
 
-    # 从环境变量覆盖
-    anthropic_api_key: str = ""
-
     @classmethod
     def load(cls, config_path: str = "config.yaml") -> "AppConfig":
+        # 1. 加载 .env 到环境变量
+        _load_env(".env")
+
+        # 2. 加载 YAML 配置
         path = Path(config_path)
         if not path.exists():
             print(f"[WARN] Config file not found: {config_path}, using defaults")
@@ -65,30 +88,40 @@ class AppConfig(BaseSettings):
         with open(path, encoding="utf-8") as f:
             raw = yaml.safe_load(f)
 
+        # 3. 递归解析 env vars
+        raw = _resolve_env_vars_recursive(raw)
+
         llm_cfg = raw.get("llm", {})
+
+        # 4. 确定 API key
+        provider = llm_cfg.get("provider", "openai")
+        api_key = llm_cfg.get("api_key", "")
+        # 如果 api_key 是 "${XXX}" 格式但没被展开，尝试从环境变量读取
+        if api_key.startswith("${") and api_key.endswith("}"):
+            env_name = api_key[2:-1]
+            api_key = os.environ.get(env_name, "")
+
         llm = LLMConfig(
-            api_key=llm_cfg.get("api_key", ""),
-            model=llm_cfg.get("model", LLMConfig.model),
-            cheap_model=llm_cfg.get("cheap_model", LLMConfig.cheap_model),
-            max_tokens=llm_cfg.get("max_tokens", LLMConfig.max_tokens),
+            provider=provider,
+            api_key=api_key,
+            base_url=llm_cfg.get("base_url", "https://api.deepseek.com"),
+            model=llm_cfg.get("model", "deepseek-chat"),
+            cheap_model=llm_cfg.get("cheap_model", "deepseek-chat"),
+            max_tokens=llm_cfg.get("max_tokens", 4096),
         )
 
         emb_cfg = raw.get("embedding", {})
         embedding = EmbeddingConfig(
-            model=emb_cfg.get("model", EmbeddingConfig.model),
-            threshold=emb_cfg.get("threshold", EmbeddingConfig.threshold),
+            model=emb_cfg.get("model", "all-MiniLM-L6-v2"),
+            threshold=emb_cfg.get("threshold", 0.75),
         )
 
         pipe_cfg = raw.get("pipeline", {})
         pipeline = PipelineConfig(
-            timezone=pipe_cfg.get("timezone", PipelineConfig.timezone),
-            output_dir=pipe_cfg.get("output_dir", PipelineConfig.output_dir),
-            max_articles_per_digest=pipe_cfg.get(
-                "max_articles_per_digest", PipelineConfig.max_articles_per_digest
-            ),
-            min_articles_to_publish=pipe_cfg.get(
-                "min_articles_to_publish", PipelineConfig.min_articles_to_publish
-            ),
+            timezone=pipe_cfg.get("timezone", "Asia/Shanghai"),
+            output_dir=pipe_cfg.get("output_dir", "../blog/content/articles"),
+            max_articles_per_digest=pipe_cfg.get("max_articles_per_digest", 8),
+            min_articles_to_publish=pipe_cfg.get("min_articles_to_publish", 3),
             source_weights=pipe_cfg.get("source_weights", {}),
         )
 
@@ -102,4 +135,20 @@ class AppConfig(BaseSettings):
         )
 
     def get_api_key(self) -> str:
-        return self.anthropic_api_key or self.llm.api_key or ""
+        """获取有效的 API key"""
+        key = getattr(self.llm, "api_key", "")
+        if key.startswith("${"):
+            env_name = key[2:-1]
+            key = os.environ.get(env_name, "")
+        return key
+
+
+def _resolve_env_vars_recursive(obj):
+    """递归替换对象中所有字符串的 ${VAR}"""
+    if isinstance(obj, str):
+        return _resolve_env_vars(obj)
+    elif isinstance(obj, dict):
+        return {k: _resolve_env_vars_recursive(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_resolve_env_vars_recursive(v) for v in obj]
+    return obj

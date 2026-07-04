@@ -25,12 +25,11 @@ class Summarizer:
             response = await self.llm(prompt)
             data = json.loads(response)
 
-            # 生成唯一 ID
-            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            slug = self._to_slug(data.get("title", article.title))
+            # 生成唯一 ID — 用标题前 40 个字符做 slug
+            slug = self._to_slug(data.get("title", article.title))[:40]
 
             return ProcessedArticle(
-                id=f"{date_str}-{slug}",
+                id=slug,
                 raw_url=article.url,
                 source_name=article.source_name,
                 original_title=article.title,
@@ -80,8 +79,9 @@ class Summarizer:
 
     @staticmethod
     def _to_slug(title: str) -> str:
-        """标题转 slug"""
+        """标题转 slug（仅英文+数字）"""
         import re
-        slug = re.sub(r'[^a-zA-Z0-9一-鿿\s-]', '', title)
-        slug = slug.strip().replace(' ', '-')[:60]
-        return slug.lower()
+        slug = re.sub(r'[^a-zA-Z0-9\s-]', '', title)
+        slug = slug.strip().replace(' ', '-')
+        slug = re.sub(r'-+', '-', slug)
+        return slug.lower().strip('-')

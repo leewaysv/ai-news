@@ -19,7 +19,9 @@ class BlogAdapter(BaseAdapter):
 
         for article in digest.articles:
             md = self._article_to_md(article, digest)
-            file_name = f"{digest.date}-{self._safe_slug(article.id)}.md"
+            # 用 digest.date 开头 + 内容提取的简短 slug
+            slug = self._safe_slug(article.title)[:60]
+            file_name = f"{digest.date}-{slug}.md"
             file_path = self.output_dir / file_name
 
             contents.append(AdaptedContent(
@@ -38,10 +40,12 @@ class BlogAdapter(BaseAdapter):
     def _article_to_md(self, article: ProcessedArticle, digest: DailyDigest) -> str:
         """单篇文章 → Hugo frontmatter + Markdown"""
         pub_time = article.published_at or datetime.now()
+        # 使用 article.id 作为 slug（不重复加日期前缀）
+        slug = self._safe_slug(article.id)
         frontmatter = {
             "title": article.title,
             "date": pub_time.strftime("%Y-%m-%dT%H:%M:%S+08:00"),
-            "slug": self._safe_slug(article.id),
+            "slug": slug,
             "source": article.source_name,
             "source_url": article.raw_url,
             "categories": article.categories,
@@ -78,6 +82,8 @@ class BlogAdapter(BaseAdapter):
     @staticmethod
     def _safe_slug(text: str) -> str:
         import re
-        slug = re.sub(r'[^a-zA-Z0-9一-鿿\s-]', '', text)
+        # 去除非 ASCII 字符和非字母数字，只保留英文和数字
+        slug = re.sub(r'[^a-zA-Z0-9\s-]', '', text)
         slug = slug.strip().replace(' ', '-').lower()[:80]
-        return slug.replace('--', '-')
+        slug = re.sub(r'-+', '-', slug)
+        return slug.strip('-')

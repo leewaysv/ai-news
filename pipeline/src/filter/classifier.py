@@ -74,21 +74,22 @@ class RelevanceClassifier:
             return []
 
         candidates = []
+        batch_articles = []
         # 批量处理，减少 LLM 调用次数
-        batch = []
         for a in articles:
-            batch.append(f"- [{a.source_name}] {a.title[:150]}")
-            if len(batch) >= 10:
-                candidates.extend(await self._judge_batch(batch, llm_fn))
-                batch = []
+            batch_articles.append(a)
+            if len(batch_articles) >= 10:
+                candidates.extend(await self._judge_batch(batch_articles, llm_fn))
+                batch_articles = []
 
-        if batch:
-            candidates.extend(await self._judge_batch(batch, llm_fn))
+        if batch_articles:
+            candidates.extend(await self._judge_batch(batch_articles, llm_fn))
 
         return candidates
 
-    async def _judge_batch(self, batch: list, llm_fn) -> list:
+    async def _judge_batch(self, articles: list[RawArticle], llm_fn) -> list[RawArticle]:
         """用 LLM 判断一批文章的相关性"""
+        labels = [f"- [{a.source_name}] {a.title[:150]}" for a in articles]
         prompt = f"""你是一个 AI 新闻编辑。以下是一批新闻标题，请选出与 AI 行业**高度相关**的条目（回索引号，用逗号分隔）。
 
 判断标准：
@@ -102,13 +103,13 @@ class RelevanceClassifier:
 - 纯教程/如何使用类内容
 
 新闻列表：
-{chr(10).join(batch)}
+{chr(10).join(labels)}
 
 只返回索引号（从 0 开始），用逗号分隔，如：0,3,5"""
         try:
             response = await llm_fn(prompt, model="cheap")
             indices = [int(i.strip()) for i in response.split(",") if i.strip().isdigit()]
-            return [batch[i] for i in indices if i < len(batch)]
+            return [articles[i] for i in indices if i < len(articles)]
         except Exception as e:
             print(f"  [WARN] LLM filter error: {e}")
             return []
