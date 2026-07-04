@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  # --- 开发调试环境 ---
+  pipeline:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+    volumes:
+      - ./pipeline:/app
+      - ./blog/content/articles:/app/output
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    working_dir: /app
+    command: python -m src.main --config config.yaml
+
+  # Hugo 本地预览
+  hugo:
+    image: klakegg/hugo:0.145.0-ext
+    volumes:
+      - ./blog:/src
+    ports:
+      - "1313:1313"
+    command: server --buildDrafts --bind 0.0.0.0
