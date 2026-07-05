@@ -1,28 +1,28 @@
 ---
-title: "[EN] OpenAI 预览 GPT-5.6 Sol：新一代模型聚焦编程、科学与网络安全"
-date: "2026-07-05T01:51:51+08:00"
+title: "[EN] OpenAI 预览 GPT-5.6 Sol：新一代模型全面升级"
+date: "2026-07-05T23:11:01+08:00"
 slug: "en-openai-gpt-56-sol"
 source: "OpenAI Blog"
 source_url: "https://openai.com/index/previewing-gpt-5-6-sol"
 categories:
-  - 人工智能
-  - 科技前沿
+  - AI 技术动态
+  - 模型发布
 tags:
-  - OpenAI
   - GPT-5.6
-  - AI安全
-  - 编程
+  - OpenAI
+  - 模型升级
   - 网络安全
-summary: "OpenAI 发布了 GPT-5.6 Sol 的预览版，该模型在编程、科学和网络安全方面能力更强，并搭载了迄今为止最先进的安全堆栈。"
+  - AI安全
+summary: "OpenAI 发布了 GPT-5.6 Sol 预览版，该模型在编程、科学和网络安全等能力上显著增强，并配备了当前最先进的安全防护体系。"
 aigc: true
 ---
-OpenAI 发布了 GPT-5.6 Sol 的预览版，该模型在编程、科学和网络安全方面能力更强，并搭载了迄今为止最先进的安全堆栈。
+OpenAI 发布了 GPT-5.6 Sol 预览版，该模型在编程、科学和网络安全等能力上显著增强，并配备了当前最先进的安全防护体系。
 
 ## 关键要点
 
-- **GPT-5.6 Sol 为下一代模型，主要提升体现在编程、科学和网络安全三大领域。**
-- **该模型配备了 OpenAI 目前最先进的安全防护体系。**
+- **GPT-5.6 Sol 在编程、科学和网络安全领域具备更强大的能力。**
+- **该模型集成了 OpenAI 迄今为止最先进的安全技术栈。**
 
-此次预览表明 OpenAI 在提升模型专业能力的同时，将安全性提升至前所未有的高度，为高风险行业应用铺平道路。
+此次升级表明 AI 模型正从通用能力向垂直领域深度优化迈进，同时安全防护成为下一代模型竞争的关键差异化因素。
 
 > 原文：[OpenAI Blog](https://openai.com/index/previewing-gpt-5-6-sol)
