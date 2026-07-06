@@ -5,7 +5,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -104,7 +104,7 @@ class Pipeline:
 
     async def run(self, dry_run: bool = False) -> int:
         """执行单次管道运行"""
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date_str = (datetime.now(timezone.utc) + timedelta(hours=8)).strftime("%Y-%m-%d")
         log.info(f"=== AI News Pipeline — {date_str} ===")
 
         # ── Step 1: Gather ──

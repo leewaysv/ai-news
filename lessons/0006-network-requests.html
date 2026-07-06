@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 6：网络请求三种方式与爬虫技术细节 — AI News 教学</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+  <style>
+    .code-compare { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .code-compare > div { flex: 1; min-width: 280px; }
+    .badge { display: inline-block; padding: 0.15em 0.5em; border-radius: 4px; font-size: 0.8em; font-weight: 600; }
+    .badge-easy { background: #d1fae5; color: #065f46; }
+    .badge-medium { background: #fef3c7; color: #92400e; }
+    .badge-hard { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+<div class="lesson">
+
+  <h1>🌐 网络请求三种方式与爬虫技术细节</h1>
+  <div class="lesson-meta">
+    Lesson 6 · 预计阅读：18 分钟 · 难度：入门到进阶 · 关联：<a href="0002-pipeline-design.html">Lesson 2：Pipeline 设计</a>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>1. 从公网获取数据的三种方式</h2>
+
+  <p>我们的 Pipeline 有三种采集器，对应三种不同的数据获取方式。你可以把它们理解成"三种敲门方式"：</p>
+
+  <table>
+    <tr><th></th><th><b>RSS 采集</b></th><th><b>API 调用</b></th><th><b>网页爬虫</b></th></tr>
+    <tr><td>本质</td><td>读一个固定格式的订阅文件</td><td>调别人写好的接口</td><td>解析 HTML 网页</td></tr>
+    <tr><td>数据格式</td><td>XML（标准化的）</td><td>JSON（结构化）</td><td>HTML（非结构化）</td></tr>
+    <tr><td>依赖</td><td>对方提供 RSS feed</td><td>对方提供 API 文档</td><td>什么都不需要</td></tr>
+    <tr><td>稳定性</td><td><span class="badge badge-easy">高</span></td><td><span class="badge badge-easy">高</span></td><td><span class="badge badge-hard">低</span></td></tr>
+    <tr><td>实现难度</td><td><span class="badge badge-easy">低</span></td><td><span class="badge badge-medium">中</span></td><td><span class="badge badge-hard">高</span></td></tr>
+    <tr><td>项目对应</td><td><code>rss_collector.py</code></td><td><code>api_collector.py</code></td><td><code>scraper.py</code></td></tr>
+  </table>
+
+  <p><b>一句话区别</b>：RSS 是别人主动"喂"给你，API 是你去"问"他要，爬虫是你自己去"拿"。</p>
+
+  <!-- ============================================================ -->
+  <h2>2. HTTP 请求基础（三种方式都离不开）</h2>
+
+  <p>不管哪种方式，底层都是 <b>HTTP 请求</b>——你的程序向远程服务器发一条消息，服务器回复一条消息。最基本的：</p>
+
+  <div class="diagram">   你的程序                        目标服务器
+   ┌──────────┐                  ┌──────────────┐
+   │          │  GET /api/xxx    │              │
+   │          │ ───────────────► │              │
+   │          │                  │              │
+   │          │  HTTP/1.1 200 OK │              │
+   │          │ ◄─────────────── │              │
+   │          │  {"data": ...}   │              │
+   └──────────┘                  └──────────────┘</div>
+
+  <h3>2.1 请求方法（Method）</h3>
+
+  <table>
+    <tr><th>方法</th><th>用途</th><th>在我们的代码中</th></tr>
+    <tr><td><b>GET</b></td><td>获取数据</td><td>所有采集器都是 GET——只读不写</td></tr>
+    <tr><td><b>POST</b></td><td>提交数据</td><td>DeepSeek API 调用（发 prompt 拿结果）</td></tr>
+  </table>
+
+  <h3>2.2 状态码（Status Code）</h3>
+
+  <p>服务器回复时带一个三位数的状态码，告诉我们结果：</p>
+
+  <table>
+    <tr><th>状态码</th><th>含义</th><th>如何处理</th></tr>
+    <tr><td><b>200</b></td><td>成功</td><td>正常解析数据</td></tr>
+    <tr><td><b>301 / 302</b></td><td>重定向</td><td>跟随新地址（httpx 默认会自动跟）</td></tr>
+    <tr><td><b>403</b></td><td>禁止访问（反爬）</td><td>需要加 User-Agent 或换策略</td></tr>
+    <tr><td><b>429</b></td><td>请求太频繁（限流）</td><td>等一会再请求（加 sleep）</td></tr>
+    <tr><td><b>500</b></td><td>服务器出错</td><td>重试几次</td></tr>
+  </table>
+
+  <p>在我们的代码里，<code>resp.raise_for_status()</code> 的作用就是：如果状态码不是 200 系列，直接抛出异常。</p>
+
+  <h3>2.3 Headers（请求头）</h3>
+
+  <p>HTTP 请求可以带一些"元信息"。最关键的是 <b>User-Agent</b>——告诉服务器"我是谁"：</p>
+
+<pre># 反面教材：不设 User-Agent（服务器一眼识别是爬虫）
+async with httpx.AsyncClient() as client:
+    resp = await client.get(url)    # ❌ 容易被封
+
+# 正确模仿：伪装成浏览器
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/120.0.0.0 Safari/537.36"
+}
+async with httpx.AsyncClient(headers=headers) as client:
+    resp = await client.get(url)    # ✅ 像真人浏览器</pre>
+
+  <p>这就是 <code>scraper.py</code> 里 <code>self.headers</code> 存在的意义——我们的爬虫伪装成了一个 Chrome 浏览器。</p>
+
+  <!-- ============================================================ -->
+  <h2>3. 方式一：RSS 采集（最简单的）</h2>
+
+  <p>RSS（Really Simple Syndication）是一种古老的标准化格式。网站维护一个 XML 文件，列出了最新文章的标题、链接、摘要。</p>
+
+  <h3>3.1 代码套路</h3>
+
+<pre>import feedparser
+
+feed = feedparser.parse("https://example.com/rss.xml")
+for entry in feed.entries:
+    title = entry.get("title")
+    link  = entry.get("link")
+    # 正文可能在 entry.content 或 entry.summary 里</pre>
+
+  <p><b>整个采集就两步</b>：parse → 遍历 entries。不需要处理 JSON、不需要解析 HTML、不需要关心反爬。因为它本来就是给人读的。</p>
+
+  <h3>3.2 优点和缺点</h3>
+
+  <table>
+    <tr><th>优点</th><th>缺点</th></tr>
+    <tr><td>代码极简，库帮你搞定一切</td><td>不是每个网站都有 RSS</td></tr>
+    <tr><td>结构化数据（标题/日期/正文都分好了）</td><td>RSS 可能只提供摘要而非全文</td></tr>
+    <tr><td>不存在反爬问题（RSS 就是设计给程序读的）</td><td>部分网站 RSS 更新不及时</td></tr>
+  </table>
+
+  <h3>3.3 本项目应用</h3>
+
+  <p>在 <code>rss_collector.py</code> 中，每个新闻源都只需要在 <code>config.yaml</code> 里配一个 RSS 地址，不需要多写一行代码。目前配置了 openai-blog、google-ai、deepmind、huggingface、techcrunch-ai 等 9 个 RSS 源。</p>
+
+  <!-- ============================================================ -->
+  <h2>4. 方式二：API 调用（最规范的）</h2>
+
+  <p>API 是网站主动提供的<b>程序接口</b>。你按它的规则发请求，它返回结构化的 JSON 数据。</p>
+
+  <h3>4.1 代码套路</h3>
+
+<pre>import httpx
+
+async with httpx.AsyncClient() as client:
+    resp = await client.get(
+        "https://api.example.com/data",
+        headers={"Authorization": "Bearer YOUR_TOKEN"},
+        params={"page": 1, "limit": 20}
+    )
+    resp.raise_for_status()      # 检查状态码
+    data = resp.json()            # 自动解析 JSON
+    for item in data["items"]:
+        print(item["title"])</pre>
+
+  <p><b>GET 请求</b>：<code>client.get(url)</code><br>
+     <b>带查询参数</b>：用 <code>params=</code> 字典<br>
+     <b>带请求头</b>：用 <code>headers=</code> 字典<br>
+     <b>解析 JSON</b>：<code>resp.json()</code></p>
+
+  <div class="callout">
+    <div class="callout-title">💡 同步 vs 异步（sync vs async）</div>
+    <p>你会注意到 RSS 采集是同步的（没有 <code>async</code>），而 API 和爬虫是异步的（<code>async/await</code>）。原因：<code>feedparser</code> 库没有 async 版本，所以 RSS 采集是普通函数。httpx 同时支持同步和异步——我们的代码选择了异步，这样在等待网络响应时，Python 可以去做别的事。两者效果一样，只是写法不同。</p>
+  </div>
+
+  <h3>4.2 本项目应用：HackerNews</h3>
+
+  <p><code>api_collector.py</code> 中的 HackerNews 采集展示了"两步走"模式：</p>
+
+<pre># 第 1 步：获取热门文章 ID 列表
+resp = await client.get("https://hacker-news.firebaseio.com/v0/topstories.json")
+story_ids = resp.json()[:30]
+
+# 第 2 步：逐个获取每篇文章的详情
+for sid in story_ids:
+    resp = await client.get(f"https://hacker-news.firebaseio.com/v0/item/{sid}.json")
+    item = resp.json()
+    # 处理 item...</pre>
+
+  <p>GitHub Trending 也是类似的 API：</p>
+
+<pre>resp = await client.get(
+    "https://api.github.com/search/repositories",
+    headers={"Accept": "application/vnd.github.v3+json"},
+    params={"q": "topic:ai", "sort": "stars", "per_page": 15}
+)</pre>
+
+  <!-- ============================================================ -->
+  <h2>5. 方式三：网页爬虫（最灵活的）</h2>
+
+  <p>当网站没有 RSS，也没有 API，就只能爬虫——直接下载 HTML 页面，然后从 HTML 中提取信息。</p>
+
+  <h3>5.1 代码套路</h3>
+
+<pre>import httpx
+from bs4 import BeautifulSoup
+
+# 1. 下载网页
+resp = httpx.get("https://example.com", headers=headers)
+soup = BeautifulSoup(resp.text, "lxml")
+
+# 2. 用选择器提取信息
+for item in soup.select(".article-title a"):
+    title = item.get_text(strip=True)   # 提取文本
+    url   = item.get("href")            # 提取链接属性</pre>
+
+  <p>关键在于第 2 步——你需要知道目标网站的 HTML 结构，才能写出正确的选择器。</p>
+
+  <h3>5.2 CSS 选择器入门</h3>
+
+  <p>BeautifulSoup 的 <code>soup.select()</code> 使用 CSS 选择器语法：</p>
+
+  <table>
+    <tr><th>选择器</th><th>含义</th><th>示例</th></tr>
+    <tr><td><code>h2</code></td><td>所有 &lt;h2&gt; 元素</td><td>标题</td></tr>
+    <tr><td><code>.title</code></td><td>所有 class="title" 的元素</td><td><code>.article-title</code></td></tr>
+    <tr><td><code>h2 a</code></td><td>&lt;h2&gt; 内部的 &lt;a&gt;</td><td>文章链接</td></tr>
+    <tr><td><code>h2 > a</code></td><td>&lt;h2&gt; 的直接子 &lt;a&gt;</td><td>更精确</td></tr>
+    <tr><td><code>.entry-title a</code></td><td>class 为 entry-title 内的 &lt;a&gt;</td><td>和项目代码一样</td></tr>
+    <tr><td><code>a[href*='/article']</code></td><td>href 包含 "/article" 的 &lt;a&gt;</td><td>机器之心爬虫</td></tr>
+  </table>
+
+  <h3>5.3 本项目中的爬虫</h3>
+
+  <p>我们的 <code>scraper.py</code> 针对量子位和机器之心写了不同的 CSS 选择器：</p>
+
+  <div class="code-compare">
+  <div><b>量子位</b>
+<pre>soup.select(
+  "article h2 a, "
+  ".entry-title a, "
+  "h3 a"
+)</pre>
+  <small>尝试三种可能的选择器，用逗号分隔（OR 逻辑）</small></div>
+
+  <div><b>机器之心</b>
+<pre>soup.select(
+  "a[href*='/article']"
+)</pre>
+  <small>找所有链接中包含 "/article" 的 &lt;a&gt;</small></div>
+  </div>
+
+  <p>为什么两个站点的写法不同？因为每个网站的前端写的 HTML 不一样。爬虫必须"因站制宜"。</p>
+
+  <!-- ============================================================ -->
+  <h2>6. 爬虫的通用思维模式</h2>
+
+  <p>写爬虫的思考步骤总是这三步：</p>
+
+  <div class="diagram">   第 1 步              第 2 步              第 3 步
+   分析目标             编写选择器             提取数据
+   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+   │ 打开网页      │     │ 找到文章列表  │     │ 拿标题       │
+   │ F12 看结构    │     │ 找出规律     │     │ 拿链接       │
+   │ 找到文章区域  │     │ 写匹配规则   │     │ 拿日期       │
+   └─────────────┘     └─────────────┘     └─────────────┘</div>
+
+  <p>实际操作：在浏览器打开目标网站 → 右键 → 检查（F12）→ 找到一篇文章 → 看它的 HTML 结构 → 写选择器匹配所有文章。</p>
+	  <!-- ============================================================ -->
+	  <h2>7. 反爬策略与对策</h2>
+
+	  <p>有些网站不希望被爬虫抓取，会设置各种<b>反爬机制</b>。以下是完整的对抗阶梯，从基础到高阶：</p>
+
+	  <h3>🔵 基础级</h3>
+
+	  <table>
+	    <tr><th>反爬类型</th><th>特征描述</th><th>应对策略</th><th>代码示例</th><th>难度</th><th>成功率</th></tr>
+
+	    <tr>
+	      <td><b>User-Agent 检查</b></td>
+	      <td>返回 403 或空数据</td>
+	      <td>伪装成浏览器 UA</td>
+	      <td><code>headers["User-Agent"] = "Mozilla/5.0 (...)"</code></td>
+	      <td>🟡 低</td>
+	      <td>90%</td>
+	    </tr>
+	    <tr>
+	      <td><b>Referer 来源校验</b></td>
+	      <td>拦截跨站请求，提示"非法请求来源"</td>
+	      <td>补充合法 Referer</td>
+	      <td><code>headers["Referer"] = "https://www.google.com/"</code></td>
+	      <td>🟡 低</td>
+	      <td>80%</td>
+	    </tr>
+	    <tr>
+	      <td><b>IP 频率限制</b></td>
+	      <td>高频请求返回 429，临时封禁 IP</td>
+	      <td>加延时，控制并发在 3-5 个</td>
+	      <td><code>await asyncio.sleep(2)</code></td>
+	      <td>🟠 中</td>
+	      <td>90%</td>
+	    </tr>
+	    <tr>
+	      <td><b>静态资源防盗链</b></td>
+	      <td>图片无法加载，显示 403 占位图</td>
+	      <td>图片请求头加 Referer</td>
+	      <td><code>headers["Referer"] = "https://site.com/"</code></td>
+	      <td>🟡 低</td>
+	      <td>70%</td>
+	    </tr>
+	  </table>
+
+	  <h3>🟠 进阶级</h3>
+
+	  <table>
+	    <tr><th>反爬类型</th><th>特征描述</th><th>应对策略</th><th>代码示例</th><th>难度</th><th>成功率</th></tr>
+
+	    <tr>
+	      <td><b>Cloudflare 人机验证</b></td>
+	      <td>弹出验证中间页（滑块/点选）</td>
+	      <td>用 cloudscraper 自动验证</td>
+	      <td><code>cloudscraper.create_scraper()</code></td>
+	      <td>🟠 中高</td>
+	      <td>60%</td>
+	    </tr>
+	    <tr>
+	      <td><b>JS 动态渲染</b></td>
+	      <td>原始 HTML 不含数据</td>
+	      <td>Playwright 等 JS 执行完再取 HTML</td>
+	      <td><code>page.wait_for_selector()</code> + <code>page.content()</code></td>
+	      <td>🟡 高</td>
+	      <td>50%</td>
+	    </tr>
+	    <tr>
+	      <td><b>图形/滑块验证码</b></td>
+	      <td>频繁访问时弹出验证码</td>
+	      <td>第三方打码平台 / Playwright + OCR</td>
+	      <td><code>slider.drag_to(target, steps=20)</code></td>
+	      <td>🟡 高</td>
+	      <td>40%</td>
+	    </tr>
+	    <tr>
+	      <td><b>字体反爬</b></td>
+	      <td>文字乱码，源码为特殊 Unicode</td>
+	      <td>下载 .woff 解析字符映射</td>
+	      <td><code>TTFont("custom.woff").getBestCmap()</code></td>
+	      <td>🟡 高</td>
+	      <td>30%</td>
+	    </tr>
+	    <tr>
+	      <td><b>请求参数签名</b></td>
+	      <td>接口带加密参数，错误返回 403</td>
+	      <td>逆向 JS，用 Python 复现签名</td>
+	      <td><code>hashlib.md5(...)</code></td>
+	      <td>🟡 高</td>
+	      <td>40%</td>
+	    </tr>
+	  </table>
+
+	  <h3>🔴 高阶</h3>
+
+	  <table>
+	    <tr><th>反爬类型</th><th>特征描述</th><th>应对策略</th><th>代码示例</th><th>难度</th><th>成功率</th></tr>
+
+	    <tr>
+	      <td><b>设备/浏览器指纹</b></td>
+	      <td>检测 Canvas/WebGL 识别自动化浏览器</td>
+	      <td>Playwright 禁用自动化特征</td>
+	      <td><code>--disable-blink-features=AutomationControlled</code></td>
+	      <td>🟢 极高</td>
+	      <td>30%</td>
+	    </tr>
+	    <tr>
+	      <td><b>行为轨迹检测</b></td>
+	      <td>检测鼠标/滚动轨迹识别非人类</td>
+	      <td>模拟带步骤的移动和随机停顿</td>
+	      <td><code>page.mouse.move(100, 200, steps=10)</code></td>
+	      <td>🟢 极高</td>
+	      <td>25%</td>
+	    </tr>
+	    <tr>
+	      <td><b>登录权限校验</b></td>
+	      <td>未登录无法看正文</td>
+	      <td>持久化登录 Cookie</td>
+	      <td><code>context.cookies()</code> 复用会话</td>
+	      <td>🟡 高</td>
+	      <td>35%</td>
+	    </tr>
+	    <tr>
+	      <td><b>蜜罐陷阱</b></td>
+	      <td>隐藏不可见链接，爬虫访问即封禁</td>
+	      <td>过滤隐藏元素</td>
+	      <td><code>soup.select('a[style*="display:none"]')</code></td>
+	      <td>🟠 中</td>
+	      <td>20%</td>
+	    </tr>
+	    <tr>
+	      <td><b>代理 IP 检测</b></td>
+	      <td>通过请求头检测并封禁代理 IP</td>
+	      <td>用高匿代理，移除代理请求头</td>
+	      <td><code>headers.pop("X-Forwarded-For", None)</code></td>
+	      <td>🟡 高</td>
+	      <td>20%</td>
+	    </tr>
+	  </table>
+
+	  <div class="callout">
+	    <div class="callout-title">🔑 反爬对抗的第一原则</div>
+	    <p><b>先用最简单的方法，逐级升级。</b>大多数网站只需要 User-Agent 伪装就够了。遇到反爬时从表格最上面开始试，而不是一上来就上 Playwright。</p>
+	  </div>
+
+  <!-- ============================================================ -->
+  <h2>8. 为什么我们的中文源都没抓到数据？</h2>
+
+  <p>回顾一下 pipeline 运行结果：量子位 0 篇、机器之心 0 篇。可能的原因：</p>
+
+  <ol>
+    <li><b>CSS 选择器过时了</b>——网站在改版，之前的 class 名称变了</li>
+    <li><b>反爬拦截</b>——简单伪造 User-Agent 不够了</li>
+    <li><b>JavaScript 渲染</b>——内容是通过 JS 动态加载的，httpx 拿不到</li>
+  </ol>
+
+  <p>如果是问题 3，就需要升级到 Playwright 方案（上面表格最后一行）。我们目前没有这个必要——英文源已经提供足够的内容。</p>
+
+  <!-- ============================================================ -->
+  <h2>9. httpx 快速参考</h2>
+
+  <p>httpx 是项目中使用的主力 HTTP 库。以下是最常用的操作：</p>
+
+<pre>import httpx
+
+# ── 同步请求（RSS 采集器用） ──
+resp = httpx.get(url)
+resp = httpx.get(url, headers=headers, params=params)
+resp.raise_for_status()
+data = resp.json()
+
+# ── 异步请求（API/爬虫用） ──
+async with httpx.AsyncClient() as client:
+    resp = await client.get(url)
+    resp = await client.get(url, headers=headers)
+    resp = await client.get(url, params={"key": "value"})
+
+# ── POST 请求（DeepSeek API 用） ──
+resp = await client.post(
+    "https://api.deepseek.com/chat/completions",
+    json={"model": "deepseek-chat", "messages": [...]}
+)
+
+# ── 常用属性 ──
+resp.status_code     # 200, 403, 429
+resp.text            # 返回的文本（HTML/XML）
+resp.json()          # 返回的 JSON
+resp.headers         # 响应头</pre>
+
+  <!-- ============================================================ -->
+  <h2>10. 其他网络请求方式</h2>
+
+  <p>除了 RSS、REST API、网页爬虫，还有一些其他的数据交换方式值得一提——你在其他项目或工作中可能会遇到：</p>
+
+  <table>
+    <tr><th>方式</th><th>传输方向</th><th>数据格式</th><th>典型场景</th><th>Python 库</th></tr>
+    <tr>
+      <td><b>WebSocket</b></td>
+      <td>双向实时</td>
+      <td>任意（常见 JSON）</td>
+      <td>聊天、股票行情、实时通知</td>
+      <td><code>websockets</code></td>
+    </tr>
+    <tr>
+      <td><b>GraphQL</b></td>
+      <td>客户端查询</td>
+      <td>JSON</td>
+      <td>灵活的数据查询（GitHub API 新版）</td>
+      <td><code>gql</code> / httpx</td>
+    </tr>
+    <tr>
+      <td><b>gRPC</b></td>
+      <td>双向（支持流）</td>
+      <td>Protobuf（二进制）</td>
+      <td>微服务内部通信、高性能场景</td>
+      <td><code>grpcio</code></td>
+    </tr>
+    <tr>
+      <td><b>SSE</b></td>
+      <td>服务端→客户端</td>
+      <td>文本流</td>
+      <td>AI 流式输出（如 DeepSeek 的 streaming）</td>
+      <td>httpx / <code>sse-starlette</code></td>
+    </tr>
+    <tr>
+      <td><b>Webhook</b></td>
+      <td>服务端→你的服务器</td>
+      <td>JSON（常见）</td>
+      <td>GitHub push 通知、支付回调</td>
+      <td>Flask / FastAPI（接收端）</td>
+    </tr>
+    <tr>
+      <td><b>FTP / SFTP</b></td>
+      <td>文件传输</td>
+      <td>文件</td>
+      <td>旧系统对接、批量文件交换</td>
+      <td><code>ftplib</code> / <code>paramiko</code></td>
+    </tr>
+    <tr>
+      <td><b>TCP / UDP 裸连接</b></td>
+      <td>双向</td>
+      <td>二进制</td>
+      <td>游戏、视频流、自定义协议</td>
+      <td><code>socket</code></td>
+    </tr>
+  </table>
+
+  <h3>10.1 WebSocket</h3>
+
+  <p>HTTP 是"一问一答"：客户端发请求，服务器回复。WebSocket 是"打电话"：建立连接后，两边随时可以说话。</p>
+
+  <p>在我们的项目中暂时没用到，但如果你以后想做"实时推送早报到读者浏览器"的功能，就需要 WebSocket。</p>
+
+<pre>import asyncio
+import websockets
+
+async def listen():
+    async with websockets.connect("wss://example.com/socket") as ws:
+        while True:
+            msg = await ws.recv()  # 等服务器推消息
+            print(f"收到: {msg}")
+
+asyncio.run(listen())</pre>
+
+  <h3>10.2 GraphQL</h3>
+
+  <p>REST API 的"升级版"。REST 的接口是固定的（/users 返回用户列表，/posts 返回文章列表），GraphQL 让你<b>自己决定要什么字段</b>：</p>
+
+<pre># REST: GET /users → 返回 id, name, email, avatar, phone, address...
+# 你不需要 address，但 REST 还是全给你
+
+# GraphQL: 你需要什么自己写
+query = """
+query {
+  users {
+    id
+    name
+    email        # 只要这三个
+  }
+}
+"""
+resp = httpx.post("https://api.example.com/graphql", json={"query": query})</pre>
+
+  <p>GitHub 的 API 同时提供 REST 和 GraphQL 两种方式。<b>GraphQL 对爬虫不太友好</b>（通常需要认证），但对前端开发者来说很灵活。</p>
+
+  <div class="callout">
+    <div class="callout-title">💡 REST 还是 GraphQL？</div>
+    <p>REST 像菜单上固定套餐（只能选套餐A/B/C）。GraphQL 像自助餐（自己挑菜）。REST 简单直接，GraphQL 灵活但复杂。对采集数据来说，REST 够用。</p>
+  </div>
+
+  <h3>10.3 gRPC</h3>
+
+  <p>谷歌开发的高性能 RPC 框架。数据不是 JSON 而是 <b>Protobuf（二进制）</b>，所以比 HTTP/JSON 快很多。通常用在微服务之间，而不是浏览器和服务器之间。</p>
+
+  <p>你大概率不会在个人项目里遇到它，但如果你去大厂工作，内部服务通信很可能用的就是 gRPC。</p>
+
+<pre># 先定义 .proto 文件
+# service NewsService { rpc GetDigest(Date) returns (Digest); }
+
+# Python 调用
+response = stub.GetDigest(Date(today="2026-07-05"))
+print(response.title)  # 直接拿到结构化数据</pre>
+
+  <h3>10.4 SSE (Server-Sent Events)</h3>
+
+  <p>SSE 和 WebSocket 类似，但是<b>单向</b>的——服务器往客户端推数据，客户端不能往回发。实现也简单得多，就是 HTTP 长连接返回一段不断追加的文本流。</p>
+
+  <p><b>DeepSeek / OpenAI 的流式输出就是 SSE</b>。当你看到 AI 一个字一个字地输出时，底层就是 SSE：</p>
+
+<pre># 服务器返回的数据流：
+data: {"content": "Open"}
+data: {"content": "AI"}
+data: {"content": " "}
+data: {"content": "发"}
+data: [DONE]</pre>
+
+  <p>在 httpx 中读取 SSE 流：</p>
+
+<pre>async with httpx.AsyncClient() as client:
+    async with client.stream("POST", url, json=body) as resp:
+        async for line in resp.aiter_lines():
+            if line.startswith("data: ") and line != "data: [DONE]":
+                chunk = line[6:]
+                print(chunk)  # 逐字输出</pre>
+
+  <h3>10.5 Webhook（反向 API）</h3>
+
+  <p>通常是你去"拿"数据，Webhook 是反过来——服务器"主动"把数据发给你。</p>
+
+  <p>举个例子：你在 GitHub 仓库设置了一个 Webhook，URL 是你自己的服务器。之后每次有人 push 代码，GitHub 就向你的服务器发一个 POST 请求，告诉你"有人 push 了"。</p>
+
+  <p>这正是我们项目中 <code>deploy-blog.yml</code> 的触发机制——GitHub 检测到 push 事件，通知 Cloudflare Pages 开始构建。</p>
+
+  <h3>10.6 选型建议</h3>
+
+  <p>遇到一个新项目需要"从网上拿数据"时，按这个优先级思考：</p>
+
+  <ol>
+    <li><b>有 RSS？</b> → 用 RSS（最简单）</li>
+    <li><b>有官方 API？</b> → 用 API（最稳定）</li>
+    <li><b>有 GraphQL？</b> → 用 GraphQL（如果 REST 不够灵活）</li>
+    <li><b>都没有？</b> → 写爬虫（最灵活）</li>
+    <li><b>需要实时推送？</b> → WebSocket / SSE</li>
+    <li><b>高性能内部通信？</b> → gRPC</li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2>11. 验证理解</h2>
+
+  <ol>
+    <li>RSS、API、爬虫三种方式有什么区别？什么时候该用哪一种？</li>
+    <li>为什么 <code>scraper.py</code> 要设置 User-Agent？不加会怎样？</li>
+    <li>如果请求返回了 429 状态码，说明什么？该怎么处理？</li>
+    <li>网站的 HTML 改版了，我的爬虫会怎样？API 和 RSS 会受影响吗？</li>
+    <li>为什么 HackerNews 采集要分两步（先拿 ID 列表，再拿详情）？</li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2>12. 推荐阅读</h2>
+
+  <ul>
+    <li><a href="https://www.python-httpx.org/" target="_blank">httpx 官方文档</a> — 本项目最主要的 HTTP 库</li>
+    <li><a href="https://www.crummy.com/software/BeautifulSoup/bs4/doc/" target="_blank">BeautifulSoup 文档</a> — HTML 解析库</li>
+    <li><a href="https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_selectors" target="_blank">CSS 选择器参考</a> — 写爬虫选择器必备</li>
+    <li><a href="https://playwright.dev/python/" target="_blank">Playwright for Python</a> — 真正的浏览器自动化，能对付 JS 渲染</li>
+    <li><a href="https://websockets.readthedocs.io/" target="_blank">websockets 库文档</a> — Python WebSocket 客户端/服务端</li>
+    <li><a href="https://grpc.io/docs/languages/python/" target="_blank">gRPC Python 文档</a> — 高性能 RPC 框架</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <div class="lesson-footer">
+    <p>课后你可以打开 <code>pipeline/src/gather/</code> 下的三个文件，对照着这节课的内容读一遍代码——你会发现每个函数都对应这节课讲的一个模式。</p>
+    <p>有什么不清楚的，随时问我 👨‍🏫</p>
+  </div>
+
+</div>
+</body>
+</html>

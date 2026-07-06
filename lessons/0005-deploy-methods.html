@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 5：个人博客部署到公网的常见方法 — AI News 教学</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<div class="lesson">
+
+  <h1>🌐 个人博客部署到公网的常见方法</h1>
+  <div class="lesson-meta">
+    Lesson 5 · 预计阅读：12 分钟 · 难度：入门 · 关联：<a href="0004-infrastructure-details.html">Lesson 4：CI/CD 与部署</a> · <a href="../reference/glossary.html">术语表</a>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>1. 两种思路</h2>
+
+  <p>把博客放到公网上，本质上只有两条路：</p>
+
+  <table>
+    <tr><th>方式</th><th>怎么做</th><th>典型服务</th></tr>
+    <tr>
+      <td><b>静态托管</b></td>
+      <td>把生成好的 HTML 文件上传到 CDN</td>
+      <td>Cloudflare Pages、Vercel、Netlify、GitHub Pages</td>
+    </tr>
+    <tr>
+      <td><b>服务器托管</b></td>
+      <td>租一台云服务器，自己装 Web 服务软件</td>
+      <td>阿里云、腾讯云、AWS EC2、VPS</td>
+    </tr>
+  </table>
+
+  <p><b>静态托管</b>适合 Hugo、Astro 这类静态站点生成器。你只需要上传最终文件，托管服务负责分发。<b>服务器托管</b>适合 WordPress、动态网站——需要运行程序、连接数据库的场景。</p>
+
+  <p>我们这个项目用的是<b>静态托管</b>，所以下面重点看这条路。</p>
+
+  <div class="callout">
+    <div class="callout-title">💡 静态托管为什么便宜</div>
+    <p>因为 CDN 只管"把已经生成好的文件发出去"，不需要在服务器上运行任何程序。这就像印刷厂印好报纸后让快递员派送——派送本身很便宜。而服务器托管像是"每家每户临时打印当天的报纸"——贵得多。</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>2. 四大静态托管平台对比</h2>
+
+  <table>
+    <tr><th></th><th>Cloudflare Pages</th><th>Vercel</th><th>Netlify</th><th>GitHub Pages</th></tr>
+    <tr>
+      <td><b>免费额度</b></td>
+      <td>无限带宽</td>
+      <td>100GB/月</td>
+      <td>100GB/月</td>
+      <td>1GB 存储</td>
+    </tr>
+    <tr>
+      <td><b>构建次数</b></td>
+      <td>500次/月</td>
+      <td>6000分钟/月</td>
+      <td>300分钟/月</td>
+      <td>10次/小时</td>
+    </tr>
+    <tr>
+      <td><b>Hugo 支持</b></td>
+      <td>✅ 原生</td>
+      <td>✅ 需配置</td>
+      <td>✅ 需配置</td>
+      <td>✅ 原生</td>
+    </tr>
+    <tr>
+      <td><b>自定义域名</b></td>
+      <td>✅ 免费</td>
+      <td>✅ 免费</td>
+      <td>✅ 免费</td>
+      <td>✅（需自己管理 DNS）</td>
+    </tr>
+    <tr>
+      <td><b>Git 集成</b></td>
+      <td>✅</td>
+      <td>✅</td>
+      <td>✅</td>
+      <td>✅（仅 GitHub）</td>
+    </tr>
+    <tr>
+      <td><b>部署方式</b></td>
+      <td>Git 推送 / Wrangler CLI</td>
+      <td>Git 推送 / Vercel CLI</td>
+      <td>Git 推送 / Netlify CLI</td>
+      <td>Git 推送</td>
+    </tr>
+  </table>
+
+  <p>四种平台本质上做的是同一件事：你 git push → 它们自动拉代码、构建、部署。区别在于免费额度、界面交互和附加功能。</p>
+
+  <!-- ============================================================ -->
+  <h2>3. 两种部署方式</h2>
+
+  <p>不管你选哪个平台，部署都有两种搞法：</p>
+
+  <h3>方式 A：平台自动构建（Git 集成）</h3>
+
+  <p>你授权平台访问你的 GitHub 仓库，平台会自动：</p>
+  <ol>
+    <li>检测到新 push</li>
+    <li>拉代码到自己服务器上</li>
+    <li>执行你配置的构建命令（如 <code>hugo --gc --minify</code>）</li>
+    <li>把输出目录部署上线</li>
+  </ol>
+
+  <p>你不需要自己准备构建环境。这就是 Cloudflare Pages 的"Connect to Git"模式。但你的项目在 monorepo 的子目录里（<code>blog/</code>），Cloudflare 的新界面把这个配置入口藏起来了，导致之前没成功。</p>
+
+  <h3>方式 B：外部 CI 推送到平台</h3>
+
+  <p>你在 GitHub Actions 里自己构建好，然后用 CLI 工具把产物推给托管平台：</p>
+
+  <div class="diagram">   GitHub Actions          Cloudflare Pages
+   ┌──────────────┐        ┌──────────────────┐
+   │ 安装 Hugo    │        │                  │
+   │ hugo 构建    │        │  收到产物 → 部署  │
+   │             │────►   │                  │
+   │ wrangler    │        │  CDN 分发         │
+   │ pages deploy│        │                  │
+   └──────────────┘        └──────────────────┘</div>
+
+  <p>这就是我们项目用的方式。优点是你完全控制构建过程，不依赖平台的构建环境。</p>
+
+  <!-- ============================================================ -->
+  <h2>4. 为什么本项目最终选了 Cloudflare Pages + GitHub Actions</h2>
+
+  <p>回顾一下我们的选择过程：</p>
+
+  <ol>
+    <li><b>GitHub Pages</b> — 最简单，但 monorepo 子目录配置复杂</li>
+    <li><b>Vercel</b> — Hugo 构建需要额外配置</li>
+    <li><b>Cloudflare Pages</b> — 无限带宽 + 最佳免费额度 + Wrangler CLI 成熟</li>
+  </ol>
+
+  <p>最终的决定是：<b>Cloudflare Pages（做存储和分发）+ GitHub Actions（做构建）</b>。理由：</p>
+  <ul>
+    <li>GitHub Actions 的 2000 分钟/月免费额度比 Cloudflare Pages 自带的 500 次构建更宽裕</li>
+    <li>Pipeline 和部署在同一个 CI 平台上，统一管理</li>
+    <li>Cloudflare 的无限带宽是最大优势——个人博客流量增长时不用担心账单</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2>5. 部署一个 Hugo 站点的通用步骤</h2>
+
+  <p>不管选哪个平台，步骤都是这 5 步：</p>
+
+  <table>
+    <tr><th>步骤</th><th>做什么</th></tr>
+    <tr><td>①</td><td>把代码推送到 GitHub（已做）</td></tr>
+    <tr><td>②</td><td>在托管平台创建项目，连接 GitHub 仓库</td></tr>
+    <tr><td>③</td><td>配置构建命令和输出目录</td></tr>
+    <tr><td>④</td><td>设置环境变量（如 <code>HUGO_VERSION</code>）</td></tr>
+    <tr><td>⑤</td><td>推送代码触发第一次部署</td></tr>
+  </table>
+
+  <p>各种 Hugo 站点的构建命令参考：</p>
+
+  <table>
+    <tr><th>项目结构</th><th>构建命令</th><th>输出目录</th></tr>
+    <tr><td>Hugo 在根目录</td><td><code>hugo --gc --minify</code></td><td><code>public</code></td></tr>
+    <tr><td>Hugo 在子目录</td><td><code>cd blog && hugo --gc --minify</code></td><td><code>blog/public</code></td></tr>
+    <tr><td>有 npm 依赖</td><td><code>npm ci && hugo --gc --minify</code></td><td><code>public</code></td></tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2>6. 自定义域名</h2>
+
+  <p>所有平台都支持绑定自己的域名。流程是：</p>
+
+  <ol>
+    <li>在域名注册商（如 Namesilo、GoDaddy、阿里云）买一个域名（如 <code>ainews.com</code>）</li>
+    <li>在托管平台添加域名，获得 DNS 记录（通常是 CNAME 或 A 记录）</li>
+    <li>去域名注册商的管理面板添加这些 DNS 记录</li>
+    <li>等待 DNS 生效（几分钟到 48 小时）</li>
+    <li>自动获得免费的 HTTPS 证书</li>
+  </ol>
+
+  <p>如果域名也托管在 Cloudflare，绑定过程可以一步完成——Cloudflare 会自动检测到。所以常见组合是"在 Namesilo 买域名，DNS 托管到 Cloudflare（免费），然后绑定到 Cloudflare Pages"。</p>
+
+  <!-- ============================================================ -->
+  <h2>7. 服务器托管（补充）</h2>
+
+  <p>前面的内容主要聚焦静态托管。这一节专门讲另一条路——<b>服务器托管</b>。</p>
+
+  <h3>7.1 什么是服务器托管</h3>
+
+  <p>服务器托管就是你<b>租一台远程电脑</b>，在上面装软件、跑程序。这台电脑 24 小时开机，有公网 IP，全世界都能访问。</p>
+
+  <table>
+    <tr><th>类型</th><th>白话解释</th><th>典型价格</th></tr>
+    <tr>
+      <td><b>VPS（虚拟专用服务器）</b></td>
+      <td>一台大服务器上划分出多个"小房间"，你租一间</td>
+      <td>$3-10/月</td>
+    </tr>
+    <tr>
+      <td><b>云服务器</b></td>
+      <td>弹性伸缩的 VPS，可以随时升级配置</td>
+      <td>¥50-200/月</td>
+    </tr>
+    <tr>
+      <td><b>独立服务器</b></td>
+      <td>整台机器全归你用</td>
+      <td>$50-200/月</td>
+    </tr>
+  </table>
+
+  <p>对于个人博客，<b>VPS 是最常见的起步选择</b>。</p>
+
+  <h3>7.2 国内外常见服务商</h3>
+
+  <table>
+    <tr><th>服务商</th><th>最低配置</th><th>月费</th><th>特点</th></tr>
+    <tr><td><b>BandwagonHOST（搬瓦工）</b></td><td>1核/512MB</td><td>$5-10</td><td>老牌 VPS，对中文用户友好</td></tr>
+    <tr><td><b>Vultr</b></td><td>1核/512MB</td><td>$6</td><td>按时计费，全球机房多</td></tr>
+    <tr><td><b>阿里云 ESC</b></td><td>1核/1GB</td><td>¥50-100</td><td>国内访问快，需备案</td></tr>
+    <tr><td><b>腾讯云 Lighthouse</b></td><td>1核/1GB</td><td>¥40-80</td><td>轻量服务器，国内快，需备案</td></tr>
+    <tr><td><b>Azure / AWS Lightsail</b></td><td>1核/512MB</td><td>$5-10</td><td>国际大厂，稳定</td></tr>
+  </table>
+
+  <div class="callout">
+    <div class="callout-title">🇨🇳 国内服务器需要备案</div>
+    <p>如果用阿里云、腾讯云等国内服务商，域名必须<b>备案</b>——即向工信部登记网站信息。备案流程 1-2 周，不是技术问题、是行政问题。如果用国外 VPS（Vultr、搬瓦工等），不需要备案，但国内用户访问速度可能慢一点。</p>
+  </div>
+
+  <h3>7.3 服务器上要装什么</h3>
+
+  <p>一台空白的服务器到手后，你需要自己装以下东西才能跑起博客：</p>
+
+  <div class="diagram">   服务器（Ubuntu 22.04）
+   ┌───────────────────────────────┐
+   │                               │
+   │  Nginx（或 Caddy）            │ ← Web 服务器，接收 HTTP 请求
+   │   └─ 反代到 Hugo / 静态文件   │    返回网页给浏览器
+   │                               │
+   │  Hugo（或 Docker）            │ ← 在服务器上构建站点
+   │                               │
+   │  GitHub Runner（可选）         │ ← 接收 GitHub 通知自动部署
+   │                               │
+   │  Certbot                      │ ← 自动申请和续期 HTTPS 证书
+   │                               │
+   └───────────────────────────────┘
+                │
+       公网 IP: 1.2.3.4
+       域名: blog.example.com</div>
+
+  <h3>7.4 部署方式对比</h3>
+
+  <table>
+    <tr><th>环节</th><th>静态托管（我们当前的方案）</th><th>VPS 服务器托管</th></tr>
+    <tr><td><b>费用</b></td><td>$0/月</td><td>$5-10/月</td></tr>
+    <tr><td><b>维护工作量</b></td><td>几乎为零</td><td>需要自己维护系统、升级软件</td></tr>
+    <tr><td><b>HTTPS</b></td><td>自动</td><td>需手动配置 Certbot</td></tr>
+    <tr><td><b>部署方式</b></td><td>Git push → 自动</td><td>需自己配置 CI 或脚本</td></tr>
+    <tr><td><b>可做的事情</b></td><td>只能托管静态文件</td><td>可以跑数据库、Web 应用、定时任务、任何软件</td></tr>
+    <tr><td><b>故障处理</b></td><td>平台负责</td><td>你自己负责</td></tr>
+  </table>
+
+  <h3>7.5 什么情况下需要服务器托管</h3>
+
+  <p>为什么我们的项目不用服务器？因为不需要。但如果出现以下需求，就该考虑上服务器了：</p>
+
+  <ul>
+    <li><b>需要用户登录</b> — 比如读者注册、评论系统</li>
+    <li><b>需要数据库</b> — 比如存储用户数据、文章阅读量</li>
+    <li><b>需要后台运行程序</b> — 比如自定义的 API、Webhook</li>
+    <li><b>需要 PHP/Node/Python 运行时</b> — 比如 WordPress、Ghost</li>
+    <li><b>国内需要备案</b> — 如果目标读者主要在国内，用国内服务器速度更快</li>
+  </ul>
+
+  <h3>7.6 "静态托管 + 轻量后端"混合方案</h3>
+
+  <p>一个常见的折中方案：博客本身用静态托管（免费），评论区等动态功能用一个<b>轻量后端服务</b>。比如：</p>
+
+  <ul>
+    <li><b>评论区</b> — 用 Giscus（基于 GitHub Discussions）或 Waline（基于 LeanCloud）</li>
+    <li><b>阅读量统计</b> — 用 Plausible（自托管）或 Umami（免费分析）</li>
+    <li><b>搜索功能</b> — 用 Pagefind（构建时生成搜索索引）</li>
+    <li><b>表单/订阅</b> — 用 Formspree 或 Getform</li>
+  </ul>
+
+  <p>这些服务大部分都有免费额度，不需要自己租服务器。这样你可以既享受静态托管的低成本，又有部分动态功能。</p>
+
+  <h3>7.7 手动部署到 VPS 的简单步骤</h3>
+
+  <p>如果你真的想试一把，步骤大概这样：</p>
+
+<pre># 1. 在服务器上安装 Nginx
+sudo apt update
+sudo apt install nginx
+
+# 2. 配置 Nginx 站点
+sudo nano /etc/nginx/sites-available/blog.example.com
+# → 设置 root 指向你的静态文件目录
+
+# 3. 启动
+sudo ln -s /etc/nginx/sites-available/blog.example.com /etc/nginx/sites-enabled/
+sudo systemctl reload nginx
+
+# 4. 配置 HTTPS（免费）
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d blog.example.com
+
+# 5. 部署新版本：用 scp 或 rsync 把本地构建好的文件传到服务器
+rsync -avz public/ user@yourserver:/var/www/blog/
+</pre>
+
+  <p>当然，这一步可以和 GitHub Actions 结合——在 Actions 里构建好后，通过 SSH 自动上传到服务器。</p>
+
+  <!-- ============================================================ -->
+  <h2>8. 内网穿透：临时测试方案</h2>
+
+  <p>如果你的博客只在本地跑（<code>hugo server</code>），只有你电脑自己能访问。但有时候你想让<b>别人临时看看效果</b>——比如给朋友验证、用手机测试、或者给甲方演示——又不想正式部署到公网。</p>
+
+  <p>这时候就需要<b>内网穿透</b>：把你本机的端口（如 <code>localhost:1313</code>）通过一个中间服务器暴露到公网上。</p>
+
+  <h3>8.1 原理</h3>
+
+  <div class="diagram">   你的电脑                 穿透服务                   访问者
+   localhost:1313          服务器                   浏览器
+   ┌──────────────┐        ┌──────────────┐        ┌──────────┐
+   │ Hugo Server  │───────►│  中转服务器   │◄───────│ 朋友手机 │
+   │ 127.0.0.1    │        │ 临时 URL     │        │ 随便哪里 │
+   └──────────────┘        └──────────────┘        └──────────┘</div>
+
+  <p>你只需要在终端跑一行命令，穿透服务会给你一个公网 URL（如 <code>https://abc123.ngrok.io</code>），任何人打开这个 URL 就能看到你本机的网页。</p>
+
+  <p>你的博客一直都在你自己电脑上，穿透服务只负责"转发"流量，不存储内容。</p>
+
+  <h3>8.2 常见的穿透工具</h3>
+
+  <table>
+    <tr><th>工具</th><th>免费额度</th><th>命令示例</th><th>特点</th></tr>
+    <tr>
+      <td><b>ngrok</b></td>
+      <td>1 个隧道，40 连接/分钟</td>
+      <td><code>ngrok http 1313</code></td>
+      <td>最知名，速度稳定，有 Web 调试界面</td>
+    </tr>
+    <tr>
+      <td><b>frp</b></td>
+      <td>需自建服务器</td>
+      <td><code>./frpc -c frpc.toml</code></td>
+      <td>开源，功能强，可自建中转服务</td>
+    </tr>
+    <tr>
+      <td><b>Tailscale Funnel</b></td>
+      <td>免费（3 用户）</td>
+      <td><code>tailscale funnel 1313</code></td>
+      <td>基于 WireGuard，需要 Tailscale 网络</td>
+    </tr>
+    <tr>
+      <td><b>Localtunnel</b></td>
+      <td>免费</td>
+      <td><code>lt --port 1313</code></td>
+      <td>无需注册，npm 安装即用</td>
+    </tr>
+    <tr>
+      <td><b>bore</b></td>
+      <td>免费</td>
+      <td><code>bore local 1313 --to bore.pub</code></td>
+      <td>Rust 写的，极简</td>
+    </tr>
+  </table>
+
+  <h3>8.3 实际操作：用 ngrok 暴露你的 Hugo 博客</h3>
+
+  <p>这是最常见的做法，三步搞定：</p>
+
+  <ol>
+    <li><b>下载 ngrok</b> — https://ngrok.com/download （Windows 下载 exe 放到任意目录）</li>
+    <li><b>启动 Hugo</b> — <code>cd blog && hugo server</code></li>
+    <li><b>启动隧道</b> — 新开一个终端，<code>ngrok http 1313</code></li>
+  </ol>
+
+  <p>终端会显示一个公网 URL：</p>
+
+<pre>Forwarding   https://a1b2c3d4.ngrok.io → http://localhost:1313</pre>
+
+  <p>把这个 URL 发给任何人，他们就能看到你的博客了。</p>
+
+  <div class="callout">
+    <div class="callout-title">🔐 ngrok 免费版的限制</div>
+    <p>免费版每次启动 URL 会变化（无法固定），每分钟限 40 个连接。这对"给朋友看看"绰绰有余，但不能用于正式服务。免费版还会在页面上显示 ngrok 的横幅广告。</p>
+  </div>
+
+  <h3>8.4 适用场景对比</h3>
+
+  <table>
+    <tr><th>场景</th><th>推荐方案</th><th>原因</th></tr>
+    <tr>
+      <td>给朋友看看效果</td>
+      <td>ngrok / bore</td>
+      <td>一行命令，用完就关</td>
+    </tr>
+    <tr>
+      <td>用手机测试页面</td>
+      <td>ngrok</td>
+      <td>手机浏览器直接打开 URL</td>
+    </tr>
+    <tr>
+      <td>团队协作演示</td>
+      <td>ngrok（付费版固定域名）</td>
+      <td>URL 不会变，演示稳定</td>
+    </tr>
+    <tr>
+      <td>持续测试服务</td>
+      <td>Tailscale Funnel</td>
+      <td>免费且持续可用</td>
+    </tr>
+    <tr>
+      <td>自建穿透服务</td>
+      <td>frp</td>
+      <td>完全自己控制</td>
+    </tr>
+  </table>
+
+  <h3>8.5 内网穿透 vs 正式部署</h3>
+
+  <table>
+    <tr><th></th><th>内网穿透（临时）</th><th>Cloudflare Pages（正式）</th></tr>
+    <tr><td>目的</td><td>临时给别人看</td><td>长期运营</td></tr>
+    <tr><td>流程</td><td>hugo server + ngrok</td><td>git push → 自动部署</td></tr>
+    <tr><td>耗时</td><td>30 秒</td><td>几分钟</td></tr>
+    <tr><td>稳定性</td><td>依赖你电脑开机</td><td>24/7 在线</td></tr>
+    <tr><td>费用</td><td>$0</td><td>$0</td></tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2>9. 验证理解</h2>
+
+  <ol>
+    <li>静态托管和服务器托管的本质区别是什么？</li>
+    <li>我们的项目部署为什么不是 Cloudflare Pages 直接构建，而是先经过 GitHub Actions？</li>
+    <li>如果以后博客流量大了，哪个平台最容易出现费用问题？哪个最不用担心？</li>
+    <li>自定义域名需要在几个地方操作？（提示：域名注册商 + 托管平台）</li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2>10. 推荐阅读</h2>
+
+  <ul>
+    <li><a href="https://developers.cloudflare.com/pages/get-started/" target="_blank">Cloudflare Pages 快速开始</a></li>
+    <li><a href="https://docs.netlify.com/" target="_blank">Netlify 文档</a></li>
+    <li><a href="https://vercel.com/docs" target="_blank">Vercel 文档</a></li>
+    <li><a href="https://pages.github.com/" target="_blank">GitHub Pages 文档</a></li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <div class="lesson-footer">
+    <p>这节课讲的是"把博客放上网"的几种常见做法。结合我们项目的实际部署过程去理解，效果最好。</p>
+    <p>有什么不清楚的，随时问我 👨‍🏫</p>
+  </div>
+
+</div>
+</body>
+</html>
