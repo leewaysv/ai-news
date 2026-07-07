@@ -28,7 +28,6 @@ class Scraper:
         """爬取单个站点的新闻列表"""
         scrapers = {
             "liangzita": self._scrape_qbitai,
-            "jiqizhixin": self._scrape_jiqizhixin,
         }
         handler = scrapers.get(source.id)
         if not handler:
@@ -51,52 +50,30 @@ class Scraper:
             soup = BeautifulSoup(resp.text, "lxml")
 
         articles = []
-        for item in soup.select("article h2 a, .entry-title a, h3 a")[:15]:
-            url = item.get("href", "")
-            title = item.get_text(strip=True)
-            if not url or not title:
+        seen_urls = set()
+
+        # 量子位的文章链接格式：/2026/07/XXXXX.html
+        for a in soup.select("a[href*='/2026/']"):
+            href = a.get("href", "")
+            text = a.get_text(strip=True)
+            if not text or not href.endswith(".html") or len(text) < 8:
                 continue
-            if url.startswith("/"):
-                url = "https://www.qbitai.com" + url
-            dedup = hashlib.md5(url.encode()).hexdigest()[:12]
+            if href in seen_urls:
+                continue
+            seen_urls.add(href)
+
+            full_url = href if href.startswith("http") else f"https://www.qbitai.com{href}"
+            dedup = hashlib.md5(full_url.encode()).hexdigest()[:12]
             articles.append(RawArticle(
                 source_id=source.id,
                 source_name=source.name,
-                url=url,
-                title=title,
+                url=full_url,
+                title=text,
                 content="",
                 published_at=datetime.now(timezone.utc),
                 lang="zh",
                 categories=["industry"],
                 dedup_hash=dedup,
             ))
-        return articles
 
-    async def _scrape_jiqizhixin(self, source: NewsSource) -> list[RawArticle]:
-        """爬取机器之心首页文章列表"""
-        async with httpx.AsyncClient(timeout=self.timeout, headers=self.headers) as client:
-            resp = await client.get(source.url)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "lxml")
-
-        articles = []
-        for item in soup.select("a[href*='/article']")[:15]:
-            url = item.get("href", "")
-            title = item.get_text(strip=True)
-            if not url or not title or len(title) < 5:
-                continue
-            if url.startswith("/"):
-                url = "https://www.jiqizhixin.com" + url
-            dedup = hashlib.md5(url.encode()).hexdigest()[:12]
-            articles.append(RawArticle(
-                source_id=source.id,
-                source_name=source.name,
-                url=url,
-                title=title,
-                content="",
-                published_at=datetime.now(timezone.utc),
-                lang="zh",
-                categories=["industry", "research"],
-                dedup_hash=dedup,
-            ))
-        return articles
+        return articles[:15]

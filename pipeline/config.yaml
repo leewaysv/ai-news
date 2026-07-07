@@ -33,6 +33,9 @@ pipeline:
     huggingface: 8
     hackernews: 6
     github-trending: 6
+    36kr-ai: 7
+    infoq-cn: 7
+    liangzita: 7
     default: 5
 
 # ------ 平台发布配置 ------
@@ -123,16 +126,23 @@ news_sources:
     lang: en
     categories: ["open-source", "tools"]
 
-  - id: jiqizhixin
-    name: "机器之心"
-    type: scrape
-    url: "https://www.jiqizhixin.com/"
-    lang: zh
-    categories: ["industry", "research"]
-
   - id: liangzita
     name: "量子位"
     type: scrape
     url: "https://www.qbitai.com/"
     lang: zh
     categories: ["industry", "tools"]
+
+  - id: 36kr-ai
+    name: "36氪 AI"
+    type: rss
+    url: "https://36kr.com/feed"
+    lang: zh
+    categories: ["industry", "startup"]
+
+  - id: infoq-cn
+    name: "InfoQ AI"
+    type: rss
+    url: "https://www.infoq.cn/feed"
+    lang: zh
+    categories: ["industry", "engineering"]
