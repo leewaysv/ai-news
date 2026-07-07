@@ -44,3 +44,38 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: daily AI digest $(date +'%Y-%m-%d')"
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/leewaysv/ai-news.git
           git push
+
+  deploy:
+    needs: digest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: blog
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: '0.145.0'
+          extended: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: hugo --gc --minify
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          npx wrangler@latest pages deploy public \
+            --project-name=ai-news \
+            --branch=master

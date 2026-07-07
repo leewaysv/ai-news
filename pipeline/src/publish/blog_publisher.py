@@ -1,12 +1,12 @@
 """博客发布器 — 将适配后的内容写入文件"""
 
-import os
 from pathlib import Path
 
 from ..models import AdaptedContent
+from .base import BasePublisher
 
 
-class BlogPublisher:
+class BlogPublisher(BasePublisher):
     """将适配后的内容写入 Hugo content 目录"""
 
     def __init__(self, output_dir: str):

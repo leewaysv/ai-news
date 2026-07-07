@@ -55,6 +55,12 @@ class PipelineConfig(BaseModel):
     source_weights: dict[str, int] = Field(default_factory=dict)
 
 
+class PlatformConfig(BaseModel):
+    """平台发布配置"""
+    enabled: bool = False
+    output_dir: str | None = None  # 覆盖 pipeline.output_dir
+
+
 class NewsSourceConfig(BaseModel):
     """Config 文件中的源定义"""
     id: str
@@ -72,6 +78,7 @@ class AppConfig(BaseModel):
     llm: LLMConfig = LLMConfig()
     embedding: EmbeddingConfig = EmbeddingConfig()
     pipeline: PipelineConfig = PipelineConfig()
+    platforms: dict[str, PlatformConfig] = Field(default_factory=dict)
     news_sources: list[NewsSourceConfig] = Field(default_factory=list)
 
     @classmethod
@@ -127,10 +134,20 @@ class AppConfig(BaseModel):
 
         sources = [NewsSourceConfig(**s) for s in raw.get("news_sources", [])]
 
+        # 6. 解析平台配置
+        raw_platforms = raw.get("platforms", {})
+        platforms = {}
+        for name, pc in raw_platforms.items():
+            if isinstance(pc, dict):
+                platforms[name] = PlatformConfig(**pc)
+            else:
+                platforms[name] = PlatformConfig(enabled=bool(pc))
+
         return cls(
             llm=llm,
             embedding=embedding,
             pipeline=pipeline,
+            platforms=platforms,
             news_sources=sources,
         )
 

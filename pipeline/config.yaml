@@ -35,6 +35,15 @@ pipeline:
     github-trending: 6
     default: 5
 
+# ------ 平台发布配置 ------
+platforms:
+  blog:
+    enabled: true
+  wechat:
+    enabled: false
+  douyin:
+    enabled: false
+
 # ------ 新闻源 ------
 news_sources:
   - id: openai-blog

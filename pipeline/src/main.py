@@ -18,7 +18,9 @@ from .gather.scraper import Scraper
 from .filter.classifier import RelevanceClassifier
 from .filter.dedup import Deduplicator
 from .summarize.summarizer import Summarizer
+from .adapt.base import BaseAdapter
 from .adapt.blog_adapter import BlogAdapter
+from .publish.base import BasePublisher
 from .publish.blog_publisher import BlogPublisher
 from .qa.embedding_check import EmbeddingQualityCheck
 from .qa.fallback import FallbackHandler
@@ -43,8 +45,6 @@ class Pipeline:
         self.dedup = Deduplicator()
         self.llm_client = None  # 运行时初始化
         self.summarizer = None
-        self.blog_adapter = BlogAdapter(config.pipeline.output_dir)
-        self.publisher = BlogPublisher(config.pipeline.output_dir)
         self.qa_check = EmbeddingQualityCheck(
             model_name=config.embedding.model,
             threshold=config.embedding.threshold,
@@ -53,6 +53,27 @@ class Pipeline:
             min_articles=config.pipeline.min_articles_to_publish
         )
         self.labeler = AIGCLabeler()
+
+    # ── 平台适配器/发布器工厂 ──
+
+    def _get_adapter(self, platform: str) -> BaseAdapter | None:
+        """根据平台名获取适配器实例"""
+        cfg = self.config.platforms.get(platform)
+        output_dir = (cfg.output_dir or self.config.pipeline.output_dir) if cfg else self.config.pipeline.output_dir
+
+        if platform == "blog":
+            return BlogAdapter(output_dir)
+        # 未来扩展：wechat → WeChatAdapter, douyin → DouyinAdapter
+        return None
+
+    def _get_publisher(self, platform: str) -> BasePublisher | None:
+        """根据平台名获取发布器实例"""
+        cfg = self.config.platforms.get(platform)
+        output_dir = (cfg.output_dir or self.config.pipeline.output_dir) if cfg else self.config.pipeline.output_dir
+
+        if platform == "blog":
+            return BlogPublisher(output_dir)
+        return None
 
     async def _llm_call(self, prompt: str, model: str = "main") -> str:
         """LLM 调用封装（支持 OpenAI 兼容接口 / Anthropic）"""
@@ -214,12 +235,32 @@ class Pipeline:
         from .models import DailyDigest
         digest = DailyDigest(**digest_data)
 
-        adapted = self.blog_adapter.adapt(digest)
-        count = self.publisher.publish(adapted)
-        log.info(f"  Published: {count} articles")
+        # 遍历已启用平台
+        total_count = 0
+        for platform_name, platform_cfg in self.config.platforms.items():
+            if not platform_cfg.enabled:
+                log.info(f"  [{platform_name}] Skipped (disabled)")
+                continue
+
+            adapter = self._get_adapter(platform_name)
+            publisher = self._get_publisher(platform_name)
+            if not adapter or not publisher:
+                log.warning(f"  [{platform_name}] No adapter/publisher registered")
+                continue
+
+            adapted = adapter.adapt(digest)
+            count = publisher.publish(adapted)
+            log.info(f"  [{platform_name}] Published: {count} articles")
+            total_count += count
+
+        if not self.config.platforms:
+            # 无 platforms 配置时，回退到原 blog-only 行为
+            adapted = BlogAdapter(self.config.pipeline.output_dir).adapt(digest)
+            total_count = BlogPublisher(self.config.pipeline.output_dir).publish(adapted)
+            log.info(f"  [blog] Published: {total_count} articles (legacy fallback)")
 
         log.info("=== Done ===")
-        return count
+        return total_count
 
 
 @click.command()
