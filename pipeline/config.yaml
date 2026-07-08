@@ -33,9 +33,9 @@ pipeline:
     huggingface: 8
     hackernews: 6
     github-trending: 6
-    36kr-ai: 7
-    infoq-cn: 7
-    liangzita: 7
+    36kr-ai: 9
+    infoq-cn: 9
+    liangzita: 9
     default: 5
 
 # ------ 平台发布配置 ------
