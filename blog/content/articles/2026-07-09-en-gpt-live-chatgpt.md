@@ -1,27 +1,27 @@
 ---
-title: "[EN] GPT-Live 发布：全新语音模型赋能ChatGPT语音交互"
-date: "2026-07-08T23:21:06+08:00"
+title: "[EN] GPT-Live 发布：新一代语音模型驱动 ChatGPT 语音交互"
+date: "2026-07-09T02:32:03+08:00"
 slug: "en-gpt-live-chatgpt"
 source: "OpenAI Blog"
 source_url: "https://openai.com/index/introducing-gpt-live"
 categories:
-  - 人工智能
-  - 语音技术
+  - AI技术
+  - 产品发布
 tags:
+  - OpenAI
   - GPT-Live
-  - ChatGPT
   - 语音模型
-  - 人机交互
-summary: "GPT-Live 是新一代语音模型，旨在实现更自然的人机语音交互，现已为 ChatGPT 语音功能提供技术支持。"
+  - ChatGPT
+summary: "OpenAI 推出 GPT-Live，这是新一代语音模型，旨在实现更自然的人机对话，现已用于 ChatGPT 的语音功能。"
 aigc: true
 ---
-GPT-Live 是新一代语音模型，旨在实现更自然的人机语音交互，现已为 ChatGPT 语音功能提供技术支持。
+OpenAI 推出 GPT-Live，这是新一代语音模型，旨在实现更自然的人机对话，现已用于 ChatGPT 的语音功能。
 
 ## 关键要点
 
-- **GPT-Live 是专为自然语音交互设计的新一代语音模型**
-- **该模型已集成至 ChatGPT 语音功能中，提升用户体验**
+- **GPT-Live 是专为自然交互设计的新一代语音模型**
+- **该模型已集成至 ChatGPT Voice，提升语音对话体验**
 
-该模型标志着AI语音交互更趋自然流畅，可能推动语音助手在客服、教育等领域的深度应用。
+GPT-Live 的推出标志着 AI 语音交互向更流畅、更拟人化迈进，有望降低用户使用门槛并拓展实时对话场景。
 
 > 原文：[OpenAI Blog](https://openai.com/index/introducing-gpt-live)
