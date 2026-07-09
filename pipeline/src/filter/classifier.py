@@ -25,6 +25,13 @@ AI_KEYWORDS = [
     "人工智能", "大模型", "大语言模型", "深度学习", "机器学习",
     "神经网络", "生成式", "多模态", "智能体", "知识图谱",
     "语义理解", "自然语言处理", "计算机视觉", "强化学习",
+    "扩散模型", "视频生成", "图像生成", "文生图", "文生视频",
+    "AI 编程", "代码生成", "AI 助手", "智能编程",
+    "开源模型", "大模型开源", "模型训练", "模型推理",
+    "AI 芯片", "GPU", "算力", "训练数据", "数据集",
+    "AI 安全", "模型安全", "对齐", "幻觉",
+    "AI 应用", "AI 工具", "AI 产品", "AI 创业",
+    "Transformer", "MoE", "稀疏模型",
 ]
 
 # 明显不相关关键词（快速过滤）
@@ -51,14 +58,10 @@ class RelevanceClassifier:
             if kw in text:
                 return None
 
-        # 中文源: 默认通过（中文源集中在 AI 领域）
-        if article.lang == "zh":
-            article.score = 0.6
-            return article
-
-        # 英文源: 检查 AI 关键词
+        # 关键词匹配分 + 语言加权
         matches = sum(1 for kw in AI_KEYWORDS if kw in text)
-        score = min(matches / 5.0, 1.0)
+        lang_bonus = 0.2 if article.lang == "zh" else 0
+        score = min(matches / 5.0 + lang_bonus, 1.0)
 
         if score < self.threshold:
             return None

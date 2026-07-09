@@ -32,6 +32,7 @@ jobs:
       - name: Run pipeline
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
         run: python -m src.main
 
       - name: Commit articles
@@ -53,6 +54,8 @@ jobs:
         working-directory: blog
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: master
 
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v3
