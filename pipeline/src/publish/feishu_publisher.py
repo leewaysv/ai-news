@@ -14,6 +14,10 @@ from .base import BasePublisher
 
 log = logging.getLogger(__name__)
 
+BLOG_BASE_URL = "https://ai-news-2li.pages.dev"
+TRUNCATE_TITLE = 60
+TRUNCATE_SUMMARY = 100
+
 
 def format_feishu_message(digest: DailyDigest) -> dict:
     """将 DailyDigest 格式化为飞书富文本消息"""
@@ -29,33 +33,23 @@ def format_feishu_message(digest: DailyDigest) -> dict:
 
     # ── 文章列表 ──
     for i, article in enumerate(digest.articles[:10], 1):
-        # 标题（带编号）
-        content.append(
-            _post_text(f"{i}. {article.title}", bold=True)
-        )
+        content.append(_post_text(str(i)))
 
-        # 摘要
+        title = article.title[:TRUNCATE_TITLE]
+        content.append(_post_text(f"📰 {title}"))
+
+        blog_url = article.raw_url or BLOG_BASE_URL
+        content.append(_post_link(f"🔗 {blog_url}", blog_url))
+
         if article.summary:
-            summary = article.summary[:120]
-            content.append(_post_text(summary, indent=True))
-
-        # 链接 + 来源（一行）
-        source = article.source_name or "来源"
-        link_text = f"🔗 查看原文 | 📍 {source}"
-        content.append(_post_link(link_text, article.raw_url))
-
-        # 关键要点
-        if article.key_points:
-            pts = " · ".join(article.key_points[:2])
-            content.append(_post_text(f"💡 {pts}", indent=True))
+            summary = article.summary[:TRUNCATE_SUMMARY]
+            content.append(_post_text(f"📝 {summary}"))
 
         content.append(_post_text(""))
-        if i < len(digest.articles[:10]):
-            content.append(_post_text(""))
+        content.append(divider)
+        content.append(_post_text(""))
 
     # ── 尾部 ──
-    content.append(divider)
-    content.append(_post_text(""))
     content.append(_post_text("🤖 本内容由 AI 辅助生成，仅供参考"))
 
     post_content = json.dumps({
@@ -74,7 +68,7 @@ def format_feishu_message(digest: DailyDigest) -> dict:
     }
 
 
-def _post_text(text: str, bold: bool = False, indent: bool = False) -> dict:
+def _post_text(text: str, bold: bool = False) -> dict:
     """飞书文本节点"""
     tag = {"tag": "text", "text": text}
     if bold:
@@ -121,7 +115,7 @@ class FeishuPublisher(BasePublisher):
                 for art in data["articles"]:
                     articles.append(ProcessedArticle(
                         id=meta.get("slug", ""),
-                        raw_url=art.get("content_source_url", ""),
+                        raw_url=meta.get("blog_url", art.get("content_source_url", "")),
                         source_name=meta.get("source", ""),
                         original_title=art.get("title", ""),
                         title=art.get("title", ""),
@@ -130,7 +124,7 @@ class FeishuPublisher(BasePublisher):
             else:
                 articles.append(ProcessedArticle(
                     id=meta.get("slug", ""),
-                    raw_url=meta.get("source_url", ""),
+                    raw_url=meta.get("blog_url", meta.get("source_url", "")),
                     source_name=meta.get("source", ""),
                     original_title=meta.get("title", ""),
                     title=meta.get("title", ""),
