@@ -4,12 +4,15 @@
 """
 
 import hashlib
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
 
 from ..models import NewsSource, RawArticle
+
+log = logging.getLogger(__name__)
 
 
 class APICollector:
@@ -26,15 +29,15 @@ class APICollector:
         }
         handler = handlers.get(source.id)
         if not handler:
-            print(f"  [WARN] No API handler for: {source.id}")
+            log.warning("No API handler for: %s", source.id)
             return []
 
         try:
             articles = await handler(source)
-            print(f"  [OK] {source.id}: {len(articles)} articles")
+            log.info("[%s] %d articles", source.id, len(articles))
             return articles
         except Exception as e:
-            print(f"  [ERROR] API fetch failed: {source.id} — {e}")
+            log.error("API fetch failed: %s — %s", source.id, e)
             return []
 
     async def _fetch_hackernews(self, source: NewsSource) -> list[RawArticle]:
@@ -84,7 +87,8 @@ class APICollector:
                         categories=["community"],
                         dedup_hash=dedup,
                     ))
-                except Exception:
+                except Exception as e:
+                    log.warning("HN item %s failed: %s", sid, e)
                     continue
 
         return articles

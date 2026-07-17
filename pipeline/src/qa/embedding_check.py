@@ -3,9 +3,12 @@
 方案 2：用 embedding 检查生成的摘要与原文的语义一致性
 """
 
+import logging
 from typing import Optional
 
 from ..models import RawArticle, ProcessedArticle
+
+log = logging.getLogger(__name__)
 
 
 class EmbeddingQualityCheck:
@@ -23,17 +26,14 @@ class EmbeddingQualityCheck:
                 from sentence_transformers import SentenceTransformer
                 self._model = SentenceTransformer(self.model_name)
             except ImportError:
-                print("[WARN] sentence-transformers not installed. Skipping embedding check.")
+                log.warning("sentence-transformers not installed. Skipping embedding check.")
                 return None
         return self._model
 
     def check(
         self, article: ProcessedArticle, raw_article: Optional[RawArticle] = None
     ) -> bool:
-        """检查一篇摘要的质量
-
-        返回: True 通过, False 不通过
-        """
+        """检查一篇摘要的质量"""
         model = self._load_model()
         if model is None:
             article.embedding_pass = True
@@ -48,7 +48,6 @@ class EmbeddingQualityCheck:
             article.embedding_pass = True
             return True
 
-        # 计算原文和摘要的 embedding 相似度（仅限同语言）
         text_a = raw_article.content[:2000]
         text_b = f"{article.summary} {' '.join(article.key_points)}"
 
@@ -59,8 +58,7 @@ class EmbeddingQualityCheck:
         passed = similarity >= self.threshold
 
         if not passed:
-            safe_title = article.title[:50].encode("utf-8", errors="replace").decode("utf-8", errors="replace")
-            print(f"  [QA FAIL] {safe_title} — similarity={similarity:.3f}")
+            log.warning("[QA FAIL] %s — similarity=%.3f", article.title[:50], similarity)
 
         article.embedding_pass = passed
         return passed

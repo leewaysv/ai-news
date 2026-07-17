@@ -3,6 +3,10 @@
 方案 3：当天有效文章不足 N 篇则跳过发布
 """
 
+import logging
+
+log = logging.getLogger(__name__)
+
 
 class FallbackHandler:
     """兜底处理逻辑"""
@@ -13,14 +17,13 @@ class FallbackHandler:
     def should_publish(self, article_count: int) -> bool:
         """判断当天是否应该发布"""
         if article_count == 0:
-            print(f"  [FALLBACK] No articles today — skipping")
+            log.info("[FALLBACK] No articles today — skipping")
             return False
         if article_count < self.min_articles:
-            print(f"  [FALLBACK] Only {article_count} articles (min {self.min_articles}) — skipping")
+            log.info("[FALLBACK] Only %d articles (min %d) — skipping", article_count, self.min_articles)
             return False
         return True
 
     def log_skip(self, date: str, reason: str):
         """记录跳过日志"""
-        import logging
-        logging.warning(f"[{date}] Skipped: {reason}")
+        log.warning("[%s] Skipped: %s", date, reason)

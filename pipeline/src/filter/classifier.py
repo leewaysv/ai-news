@@ -3,10 +3,13 @@
 策略：先用规则快速过滤 → 再用 LLM 精判候选项
 """
 
+import logging
 import re
 from typing import Optional
 
 from ..models import RawArticle
+
+log = logging.getLogger(__name__)
 
 
 # AI 相关关键词（用于快速规则过滤）
@@ -39,7 +42,7 @@ IRRELEVANT_KEYWORDS = [
     "sports", "nfl", "nba", "baseball", "soccer",
     "recipe", "cooking", "food",
     "celebrity", "entertainment",
-    "crypto", "bitcoin", "nft", "blockchain",  # Web3 非 AI
+    "crypto", "bitcoin", "nft", "blockchain",
 ]
 
 
@@ -53,12 +56,10 @@ class RelevanceClassifier:
         """快速规则过滤 — 低成本筛掉明显无关内容"""
         text = f"{article.title} {article.content}".lower()
 
-        # 不相关关键词
         for kw in IRRELEVANT_KEYWORDS:
             if kw in text:
                 return None
 
-        # 关键词匹配分 + 语言加权
         matches = sum(1 for kw in AI_KEYWORDS if kw in text)
         lang_bonus = 0.2 if article.lang == "zh" else 0
         score = min(matches / 5.0 + lang_bonus, 1.0)
@@ -78,7 +79,6 @@ class RelevanceClassifier:
 
         candidates = []
         batch_articles = []
-        # 批量处理，减少 LLM 调用次数
         for a in articles:
             batch_articles.append(a)
             if len(batch_articles) >= 10:
@@ -91,7 +91,6 @@ class RelevanceClassifier:
         return candidates
 
     async def _judge_batch(self, articles: list[RawArticle], llm_fn) -> list[RawArticle]:
-        """用 LLM 判断一批文章的相关性"""
         labels = [f"- [{a.source_name}] {a.title[:150]}" for a in articles]
         prompt = f"""你是一个 AI 新闻编辑。以下是一批新闻标题，请选出与 AI 行业**高度相关**的条目（回索引号，用逗号分隔）。
 
@@ -114,5 +113,5 @@ class RelevanceClassifier:
             indices = [int(i.strip()) for i in response.split(",") if i.strip().isdigit()]
             return [articles[i] for i in indices if i < len(articles)]
         except Exception as e:
-            print(f"  [WARN] LLM filter error: {e}")
+            log.warning("LLM filter error: %s", e)
             return []

@@ -1,6 +1,7 @@
 """通用网页爬虫（用于中文源等无 RSS 的站点）"""
 
 import hashlib
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Optional
@@ -9,6 +10,8 @@ import httpx
 from bs4 import BeautifulSoup
 
 from ..models import NewsSource, RawArticle
+
+log = logging.getLogger(__name__)
 
 
 class Scraper:
@@ -31,15 +34,15 @@ class Scraper:
         }
         handler = scrapers.get(source.id)
         if not handler:
-            print(f"  [WARN] No scraper handler for: {source.id}")
+            log.warning("No scraper handler for: %s", source.id)
             return []
 
         try:
             articles = await handler(source)
-            print(f"  [OK] {source.id}: {len(articles)} articles")
+            log.info("[%s] %d articles", source.id, len(articles))
             return articles
         except Exception as e:
-            print(f"  [ERROR] Scrape failed: {source.id} — {e}")
+            log.error("Scrape failed: %s — %s", source.id, e)
             return []
 
     async def _scrape_qbitai(self, source: NewsSource) -> list[RawArticle]:
@@ -52,8 +55,10 @@ class Scraper:
         articles = []
         seen_urls = set()
 
-        # 量子位的文章链接格式：/2026/07/XXXXX.html
-        for a in soup.select("a[href*='/2026/']"):
+        # 动态使用当前年份，避免硬编码
+        current_year = datetime.now().year
+        year_pattern = re.compile(rf"/{current_year}/\d{{2}}/.+\.html")
+        for a in soup.select(f'a[href*="/{current_year}/"]'):
             href = a.get("href", "")
             text = a.get_text(strip=True)
             if not text or not href.endswith(".html") or len(text) < 8:

@@ -1,11 +1,14 @@
 """LLM 摘要生成器"""
 
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from ..models import ProcessedArticle, RawArticle
 from .prompt import SUMMARIZE_PROMPT, DIGEST_PROMPT
+
+log = logging.getLogger(__name__)
 
 
 class Summarizer:
@@ -18,14 +21,13 @@ class Summarizer:
         """单篇文章摘要"""
         prompt = SUMMARIZE_PROMPT.format(
             title=article.title,
-            content=article.content[:8000],  # 截断以防超 token
+            content=article.content[:8000],
             lang=article.lang,
         )
         try:
             response = await self.llm(prompt)
             data = json.loads(response)
 
-            # 生成唯一 ID — 用标题前 40 个字符做 slug
             slug = self._to_slug(data.get("title", article.title))[:40]
 
             return ProcessedArticle(
@@ -44,7 +46,7 @@ class Summarizer:
                 aigc_label=True,
             )
         except Exception as e:
-            print(f"  [WARN] Summarize failed: {article.title[:50]} — {e}")
+            log.warning("Summarize failed: %s — %s", article.title[:50], e)
             return None
 
     async def create_digest(
@@ -54,7 +56,6 @@ class Summarizer:
         if not articles:
             return {"date": date_str, "title": "", "articles": []}
 
-        # 拼接文章列表
         article_list = "\n".join(
             f"{i+1}. {a.title}\n   {a.summary[:100]}"
             for i, a in enumerate(articles[:8])
@@ -68,7 +69,7 @@ class Summarizer:
             response = await self.llm(prompt)
             data = json.loads(response)
         except Exception as e:
-            print(f"  [WARN] Digest creation failed: {e}")
+            log.warning("Digest creation failed: %s", e)
             data = {}
 
         return {
@@ -80,7 +81,6 @@ class Summarizer:
 
     @staticmethod
     def _to_slug(title: str) -> str:
-        """标题转 slug（仅英文+数字）"""
         import re
         slug = re.sub(r'[^a-zA-Z0-9\s-]', '', title)
         slug = slug.strip().replace(' ', '-')

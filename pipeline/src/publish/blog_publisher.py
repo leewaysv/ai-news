@@ -1,9 +1,12 @@
 """博客发布器 — 将适配后的内容写入文件"""
 
+import logging
 from pathlib import Path
 
 from ..models import AdaptedContent
 from .base import BasePublisher
+
+log = logging.getLogger(__name__)
 
 
 class BlogPublisher(BasePublisher):
@@ -27,7 +30,7 @@ class BlogPublisher(BasePublisher):
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content.content)
 
-            print(f"  [PUBLISH] {file_path.name}")
+            log.info("[PUBLISH] %s", file_path.name)
             count += 1
 
         return count

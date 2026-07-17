@@ -73,6 +73,8 @@ class Pipeline:
             return WeChatAdapter()
         if platform == "douyin":
             return DouyinAdapter()
+        if platform == "feishu":
+            return BlogAdapter(output_dir)
         return None
 
     def _get_publisher(self, platform: str) -> BasePublisher | None:
