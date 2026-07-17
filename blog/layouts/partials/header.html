@@ -1,18 +1,18 @@
-<header class="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm sticky top-0 z-50">
+<header class="sticky top-0 z-50 bg-white/70 dark:bg-gray-950/70 backdrop-blur-lg border-b border-gray-200/50 dark:border-gray-800/50">
   <nav class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-    <a href="{{ .Site.Home.RelPermalink }}" class="text-xl font-bold text-gray-900 dark:text-white tracking-tight hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+    <a href="{{ .Site.Home.RelPermalink }}" class="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white tracking-tight hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline">
       {{ .Site.Title }}
     </a>
 
-    <div class="flex items-center gap-6">
+    <div class="flex items-center gap-5">
       {{- $currentPage := . }}
       {{- range .Site.Menus.main }}
         <a href="{{ .URL }}"
-           class="text-sm font-medium transition-colors
+           class="text-sm font-medium transition-colors no-underline
                   {{ if $currentPage.IsMenuCurrent "main" . }}
                     text-blue-600 dark:text-blue-400
                   {{ else }}
-                    text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100
+                    text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100
                   {{ end }}">
           {{ .Name }}
         </a>

@@ -6,7 +6,8 @@ html {
 }
 
 body {
-  @apply bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 antialiased;
+  @apply bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 /* ===== 文章排版 ===== */
@@ -14,16 +15,12 @@ body {
   @apply leading-relaxed text-gray-800 dark:text-gray-200;
 }
 
-.article-content h1 {
-  @apply text-3xl font-bold mt-10 mb-4 text-gray-900 dark:text-white;
-}
-
 .article-content h2 {
-  @apply text-2xl font-bold mt-8 mb-3 text-gray-900 dark:text-white;
+  @apply text-2xl font-bold mt-10 mb-4 text-gray-900 dark:text-white;
 }
 
 .article-content h3 {
-  @apply text-xl font-semibold mt-6 mb-2 text-gray-900 dark:text-white;
+  @apply text-xl font-semibold mt-8 mb-3 text-gray-900 dark:text-white;
 }
 
 .article-content p {
@@ -71,52 +68,161 @@ body {
   @apply my-8 border-gray-200 dark:border-gray-700;
 }
 
-.article-content table {
-  @apply w-full mb-5 border-collapse;
-}
-
-.article-content th {
-  @apply bg-gray-100 dark:bg-gray-800 px-3 py-2 text-left font-semibold border border-gray-200 dark:border-gray-700;
-}
-
-.article-content td {
-  @apply px-3 py-2 border border-gray-200 dark:border-gray-700;
-}
-
 .article-content img {
   @apply max-w-full h-auto rounded-lg my-6;
 }
 
-/* ===== 文章卡片 ===== */
+/* ===== 文章卡片（全新设计，参考 Blockchain.News） ===== */
 .article-card {
-  @apply border border-gray-200 dark:border-gray-800 rounded-xl p-5
-         hover:border-blue-300 dark:hover:border-blue-700
+  @apply relative overflow-hidden rounded-2xl p-6
+         bg-white/80 dark:bg-gray-900/60
+         border border-gray-200/60 dark:border-gray-800/60
+         backdrop-blur-sm
+         transition-all duration-300 ease-out;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.article-card:hover {
+  @apply border-blue-300/60 dark:border-blue-700/60;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 4px 10px rgba(59, 130, 246, 0.05);
+  transform: translateY(-2px);
+}
+
+.article-card-title {
+  @apply text-lg font-semibold text-gray-900 dark:text-gray-100
          transition-colors duration-200;
 }
 
-.article-card:hover .article-card-title {
+.article-card:hover .article-card-title a {
   @apply text-blue-600 dark:text-blue-400;
 }
 
-/* ===== 标签 ===== */
-.tag {
-  @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-medium
-         bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400;
+/* ===== 来源标签（赛博风格，参考 Blockchain.News） ===== */
+.source-badge {
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
+         bg-blue-50 dark:bg-blue-950/40
+         text-blue-700 dark:text-blue-300
+         border border-blue-200/50 dark:border-blue-800/50;
 }
 
-/* ===== 暗色模式切换按钮 ===== */
+/* ===== 分类标签 ===== */
+.tag {
+  @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-medium
+         bg-gray-100 dark:bg-gray-800
+         text-gray-500 dark:text-gray-400
+         border border-transparent
+         transition-colors duration-200;
+}
+
+.tag:hover {
+  @apply bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400
+         border-blue-200/50 dark:border-blue-800/50;
+}
+
+/* ===== AI 标签 ===== */
+.tag-aigc {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+         bg-purple-50 dark:bg-purple-950/40
+         text-purple-600 dark:text-purple-300
+         border border-purple-200/50 dark:border-purple-800/50;
+}
+
+/* ===== 日期徽章（每日分组） ===== */
+.date-badge {
+  @apply inline-flex items-center gap-2 text-sm font-semibold
+         text-gray-500 dark:text-gray-400
+         px-4 py-1.5 rounded-lg
+         bg-white/60 dark:bg-gray-900/40
+         border border-gray-200/40 dark:border-gray-800/40
+         backdrop-blur-sm;
+}
+
+/* ===== 文章详情页头部 ===== */
+.article-header {
+  @apply relative overflow-hidden rounded-2xl p-8 mb-8
+         bg-gradient-to-br from-blue-50/80 via-white to-purple-50/30
+         dark:from-gray-900/80 dark:via-gray-900/60 dark:to-purple-950/20
+         border border-gray-200/40 dark:border-gray-800/40
+         backdrop-blur-sm;
+}
+
+/* ===== 正文容器 ===== */
+.article-body {
+  @apply px-1 max-w-none;
+}
+
+/* ===== 来源卡片 ===== */
+.source-card {
+  @apply flex items-center gap-3 p-4 rounded-xl
+         bg-gray-50 dark:bg-gray-900/60
+         border border-gray-200/50 dark:border-gray-800/50
+         transition-colors duration-200;
+}
+
+.source-card:hover {
+  @apply border-blue-200/60 dark:border-blue-800/60;
+}
+
+/* ===== 订阅提示 ===== */
+.subscribe-bar {
+  @apply relative overflow-hidden rounded-2xl p-5 text-center
+         bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-purple-50/90
+         dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-purple-950/30
+         border border-blue-200/40 dark:border-blue-900/40
+         backdrop-blur-sm;
+}
+
+/* ===== 站点标题区域 ===== */
+.site-hero {
+  @apply text-center py-8 mb-2;
+}
+
+.site-hero h1 {
+  @apply text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-3;
+  letter-spacing: -0.02em;
+}
+
+.site-hero p {
+  @apply text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto;
+}
+
+/* ===== 分隔线 ===== */
+.section-divider {
+  @apply my-2 border-t border-gray-100 dark:border-gray-800/60;
+}
+
+/* ===== 暗色模式切换 ===== */
 .theme-toggle {
   @apply p-2 rounded-lg text-gray-500 dark:text-gray-400
          hover:bg-gray-100 dark:hover:bg-gray-800
          transition-colors duration-200 cursor-pointer;
 }
 
+/* ===== 页脚 ===== */
+.site-footer {
+  @apply border-t border-gray-200/60 dark:border-gray-800/60
+         bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm;
+}
+
 /* ===== 动画 ===== */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 .article-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+  animation: fadeInUp 0.45s ease-out forwards;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ===== 骨架屏加载效果 ===== */
+.skeleton {
+  @apply rounded-xl bg-gray-200 dark:bg-gray-800;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }

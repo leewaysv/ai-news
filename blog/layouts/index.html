@@ -1,33 +1,37 @@
 {{ define "main" }}
 <div class="space-y-10">
+
   <!-- 站点描述 -->
-  <div class="text-center py-6">
-    <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-3">
-      {{ .Site.Title }}
-    </h1>
-    <p class="text-lg text-gray-500 dark:text-gray-400">
-      {{ .Site.Params.description }}
-    </p>
+  <div class="site-hero">
+    <h1>{{ .Site.Title }}</h1>
+    <p>{{ .Site.Params.description }}</p>
   </div>
 
   <!-- 订阅提示 -->
-  <div class="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-xl p-4 text-center">
+  <div class="subscribe-bar">
     <p class="text-sm text-blue-700 dark:text-blue-300">
-      每日更新 · 精选 AI 资讯
-      <a href="{{ "feed.xml" | relURL }}" class="font-medium underline hover:no-underline">RSS 订阅</a>
+      每日更新 · 精选 AI 资讯 ·
+      <a href="{{ "feed.xml" | relURL }}" class="font-semibold underline hover:no-underline">RSS 订阅</a>
     </p>
   </div>
 
+  <div class="section-divider"></div>
+
   <!-- 文章列表 -->
-  <div class="space-y-8">
+  <div class="space-y-10">
     {{- $pages := where .Site.RegularPages "Section" "articles" }}
     {{- $grouped := $pages.GroupByDate "2006-01-02" "desc" }}
-    {{- range $grouped }}
-      <section class="article-fade-in">
-        <h2 class="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-4">
-          {{ .Key }}
-        </h2>
-        <div class="space-y-3">
+    {{- range $i, $group := $grouped }}
+      <section class="article-fade-in" style="animation-delay: {{ mul $i 0.05 }}s;">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="date-badge">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            {{ .Key }}
+          </div>
+        </div>
+        <div class="space-y-4">
           {{- range .Pages }}
             {{ partial "article-card.html" . }}
           {{- end }}

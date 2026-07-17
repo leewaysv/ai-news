@@ -15,39 +15,49 @@ from .base import BasePublisher
 log = logging.getLogger(__name__)
 
 
-# ── Cycle 1: format_feishu_message ──
-
-
 def format_feishu_message(digest: DailyDigest) -> dict:
-    """将 DailyDigest 格式化为飞书富文本消息
-
-    飞书 Webhook 消息格式:
-    https://open.feishu.cn/document/server-docs/im-v1/message-content-description
-    """
+    """将 DailyDigest 格式化为飞书富文本消息"""
     content = []
+    divider = {"tag": "hr"}
 
-    # 标题行
+    # ── 标题 ──
     title_text = f"📰 AI 早报 | {digest.date}" if digest.date else "📰 AI 早报"
     content.append(_post_text(title_text, bold=True))
     content.append(_post_text(""))
+    content.append(divider)
+    content.append(_post_text(""))
 
-    # 文章列表
-    for i, article in enumerate(digest.articles[:8], 1):
+    # ── 文章列表 ──
+    for i, article in enumerate(digest.articles[:10], 1):
+        # 标题（带编号）
         content.append(
             _post_text(f"{i}. {article.title}", bold=True)
         )
+
+        # 摘要
         if article.summary:
-            content.append(_post_text(f"   {article.summary[:80]}"))
-        content.append(
-            _post_link("🔗 查看原文", article.raw_url)
-        )
-        content.append(_post_text(f"   来源: {article.source_name}"))
+            summary = article.summary[:120]
+            content.append(_post_text(summary, indent=True))
+
+        # 链接 + 来源（一行）
+        source = article.source_name or "来源"
+        link_text = f"🔗 查看原文 | 📍 {source}"
+        content.append(_post_link(link_text, article.raw_url))
+
+        # 关键要点
+        if article.key_points:
+            pts = " · ".join(article.key_points[:2])
+            content.append(_post_text(f"💡 {pts}", indent=True))
+
         content.append(_post_text(""))
+        if i < len(digest.articles[:10]):
+            content.append(_post_text(""))
 
-    # 尾部
-    content.append(_post_text("──── powered by AI ────"))
+    # ── 尾部 ──
+    content.append(divider)
+    content.append(_post_text(""))
+    content.append(_post_text("🤖 本内容由 AI 辅助生成，仅供参考"))
 
-    # post 类型的 content 需为 JSON 字符串，包含 "post" 键
     post_content = json.dumps({
         "post": {
             "zh_cn": {
@@ -64,17 +74,17 @@ def format_feishu_message(digest: DailyDigest) -> dict:
     }
 
 
-def _post_text(text: str, bold: bool = False) -> dict:
-    """飞书文本节点（Webhook 不支持 style，忽略 bold）"""
-    return {"tag": "text", "text": text}
+def _post_text(text: str, bold: bool = False, indent: bool = False) -> dict:
+    """飞书文本节点"""
+    tag = {"tag": "text", "text": text}
+    if bold:
+        tag["style"] = ["bold"]
+    return tag
 
 
 def _post_link(text: str, url: str) -> dict:
     """飞书链接节点"""
     return {"tag": "a", "text": text, "href": url}
-
-
-# ── Cycle 2: FeishuPublisher ──
 
 
 class FeishuPublisher(BasePublisher):
@@ -84,11 +94,9 @@ class FeishuPublisher(BasePublisher):
         self.webhook_url = webhook_url or os.environ.get("FEISHU_WEBHOOK_URL", "")
 
     async def publish(self, contents: list[AdaptedContent]) -> int:
-        """将适配后的内容发送到飞书群"""
         if not contents or not self.webhook_url:
             return 0
 
-        # 从第一个 AdaptedContent 中恢复 Digest 信息
         digest = self._build_digest(contents)
         if not digest.articles:
             return 0
@@ -97,14 +105,12 @@ class FeishuPublisher(BasePublisher):
         return await self._send(payload)
 
     def _build_digest(self, contents: list[AdaptedContent]) -> DailyDigest:
-        """从 AdaptedContent 列表重建 DailyDigest"""
         from ..models import ProcessedArticle
 
         articles = []
         for item in contents:
             meta = item.metadata or {}
 
-            # 尝试解析为 JSON（WeChat/Douyin 格式）
             data = None
             try:
                 data = json.loads(item.content)
@@ -119,7 +125,7 @@ class FeishuPublisher(BasePublisher):
                         source_name=meta.get("source", ""),
                         original_title=art.get("title", ""),
                         title=art.get("title", ""),
-                        summary=self._extract_text(art.get("content", "")),
+                        summary=_extract_text(art.get("content", "")),
                     ))
             else:
                 articles.append(ProcessedArticle(
@@ -137,16 +143,7 @@ class FeishuPublisher(BasePublisher):
             articles=articles,
         )
 
-    @staticmethod
-    def _extract_text(html: str) -> str:
-        """从 HTML 中提取纯文本"""
-        import re
-        text = re.sub(r"<[^>]+>", "", html)
-        text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-        return text.strip()[:100]
-
     async def _send(self, payload: dict) -> int:
-        """发送 Webhook 请求"""
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
@@ -168,3 +165,11 @@ class FeishuPublisher(BasePublisher):
         except Exception as e:
             log.warning(f"[feishu] Send failed: {e}")
             return 0
+
+
+def _extract_text(html: str) -> str:
+    """从 HTML 中提取纯文本"""
+    import re
+    text = re.sub(r"<[^>]+>", "", html)
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    return text.strip()[:150]
