@@ -36,6 +36,7 @@ class Summarizer:
                 title=data.get("title", article.title),
                 summary=data.get("summary", ""),
                 key_points=data.get("key_points", []),
+                detailed_analysis=data.get("detailed_analysis", ""),
                 analysis=data.get("analysis", ""),
                 categories=data.get("categories", article.categories),
                 tags=data.get("tags", []),

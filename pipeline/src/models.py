@@ -48,12 +48,14 @@ class ProcessedArticle(BaseModel):
     title: str
     summary: str
     key_points: list[str] = Field(default_factory=list)
+    detailed_analysis: Optional[str] = None
     analysis: Optional[str] = None
     categories: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     published_at: Optional[datetime] = None
     aigc_label: bool = True
     embedding_pass: bool = True
+    image_url: Optional[str] = None
 
 
 class DailyDigest(BaseModel):
