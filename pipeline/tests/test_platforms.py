@@ -51,8 +51,17 @@ class TestPlatformDispatch:
         pipeline = Pipeline(config_with_blog_enabled)
         assert pipeline._get_publisher("unknown") is None
 
-    def test_future_platforms_return_none(self, config_with_blog_enabled):
-        """wechat 和 douyin 尚未实现，返回 None"""
+    def test_all_platform_adapters(self, config_with_blog_enabled):
+        """所有平台适配器均已注册"""
         pipeline = Pipeline(config_with_blog_enabled)
-        assert pipeline._get_adapter("wechat") is None
-        assert pipeline._get_adapter("douyin") is None
+        from src.adapt.wechat_adapter import WeChatAdapter
+        from src.adapt.douyin_adapter import DouyinAdapter
+        assert isinstance(pipeline._get_adapter("wechat"), WeChatAdapter)
+        assert isinstance(pipeline._get_adapter("douyin"), DouyinAdapter)
+        assert pipeline._get_adapter("unknown") is None
+
+    def test_wechat_publisher_needs_credentials(self, config_with_blog_enabled):
+        """wechat publisher 需要 app_id/app_secret 才返回实例"""
+        pipeline = Pipeline(config_with_blog_enabled)
+        # mock 配置没有 app_id/app_secret，应返回 None
+        assert pipeline._get_publisher("wechat") is None

@@ -59,6 +59,9 @@ class PlatformConfig(BaseModel):
     """平台发布配置"""
     enabled: bool = False
     output_dir: str | None = None  # 覆盖 pipeline.output_dir
+    app_id: str = ""               # API 凭据（微信等平台）
+    app_secret: str = ""           # API 凭据
+    method: str = "api"            # 发布方式: "api" | "playwright"
 
 
 class NewsSourceConfig(BaseModel):

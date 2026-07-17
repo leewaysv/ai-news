@@ -44,8 +44,13 @@ platforms:
     enabled: true
   wechat:
     enabled: false
+    method: playwright
+    app_id: "${WECHAT_APP_ID}"
+    app_secret: "${WECHAT_APP_SECRET}"
   douyin:
     enabled: false
+  feishu:
+    enabled: true
 
 # ------ 新闻源 ------
 news_sources:

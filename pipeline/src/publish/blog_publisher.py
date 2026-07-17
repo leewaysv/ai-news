@@ -12,7 +12,7 @@ class BlogPublisher(BasePublisher):
     def __init__(self, output_dir: str):
         self.output_dir = Path(output_dir)
 
-    def publish(self, contents: list[AdaptedContent]) -> int:
+    async def publish(self, contents: list[AdaptedContent]) -> int:
         """写入所有文章文件，返回写入数量"""
         self.output_dir.mkdir(parents=True, exist_ok=True)
         count = 0

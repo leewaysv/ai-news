@@ -9,6 +9,6 @@ class BasePublisher(ABC):
     """内容发布器 — 将适配后的内容发布到目标平台"""
 
     @abstractmethod
-    def publish(self, contents: list[AdaptedContent]) -> int:
+    async def publish(self, contents: list[AdaptedContent]) -> int:
         """发布适配后的内容，返回成功发布数量"""
         ...

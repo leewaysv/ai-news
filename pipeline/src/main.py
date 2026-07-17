@@ -20,8 +20,14 @@ from .filter.dedup import Deduplicator
 from .summarize.summarizer import Summarizer
 from .adapt.base import BaseAdapter
 from .adapt.blog_adapter import BlogAdapter
+from .adapt.wechat_adapter import WeChatAdapter
+from .adapt.douyin_adapter import DouyinAdapter
 from .publish.base import BasePublisher
 from .publish.blog_publisher import BlogPublisher
+from .publish.wechat_publisher import WeChatAuth, WeChatPublisher
+from .publish.wechat_playwright import PlaywrightWeChatPublisher
+from .publish.douyin_video import DouyinVideoPublisher
+from .publish.feishu_publisher import FeishuPublisher
 from .qa.embedding_check import EmbeddingQualityCheck
 from .qa.fallback import FallbackHandler
 from .compliance.aigc_label import AIGCLabeler
@@ -63,7 +69,10 @@ class Pipeline:
 
         if platform == "blog":
             return BlogAdapter(output_dir)
-        # 未来扩展：wechat → WeChatAdapter, douyin → DouyinAdapter
+        if platform == "wechat":
+            return WeChatAdapter()
+        if platform == "douyin":
+            return DouyinAdapter()
         return None
 
     def _get_publisher(self, platform: str) -> BasePublisher | None:
@@ -73,6 +82,21 @@ class Pipeline:
 
         if platform == "blog":
             return BlogPublisher(output_dir)
+        if platform == "wechat":
+            cfg = self.config.platforms.get(platform)
+            if not cfg:
+                return None
+            method = getattr(cfg, 'method', 'api')
+            if method == "playwright":
+                return PlaywrightWeChatPublisher()
+            if getattr(cfg, 'app_id', '') and getattr(cfg, 'app_secret', ''):
+                auth = WeChatAuth(cfg.app_id, cfg.app_secret)
+                return WeChatPublisher(auth=auth)
+            return None
+        if platform == "douyin":
+            return DouyinVideoPublisher()
+        if platform == "feishu":
+            return FeishuPublisher()
         return None
 
     async def _llm_call(self, prompt: str, model: str = "main") -> str:
@@ -249,7 +273,7 @@ class Pipeline:
                 continue
 
             adapted = adapter.adapt(digest)
-            count = publisher.publish(adapted)
+            count = await publisher.publish(adapted)
             log.info(f"  [{platform_name}] Published: {count} articles")
             total_count += count
 

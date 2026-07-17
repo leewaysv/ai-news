@@ -13,12 +13,12 @@ dependencies = [
     "pydantic-settings>=2.0",
     "anthropic>=0.30",
     "sentence-transformers>=3.0",
+    "playwright>=1.40",
     "click>=8.0",
 ]
 
 [project.scripts]
 ai-news = "src.main:cli"
-prototype-wechat = "prototypes.wechat.tui:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
