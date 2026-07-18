@@ -17,37 +17,30 @@ log = logging.getLogger(__name__)
 BLOG_BASE_URL = "https://ai-news-2li.pages.dev"
 TRUNCATE_TITLE = 60
 TRUNCATE_SUMMARY = 100
-SEPARATOR = "─" * 24
 
 
 def format_feishu_message(digest: DailyDigest) -> dict:
     """将 DailyDigest 格式化为飞书富文本消息"""
     content = []
-    divider = _post_text(SEPARATOR)
 
     # ── 标题 ──
     title_text = f"📰 AI 早报 | {digest.date}" if digest.date else "📰 AI 早报"
     content.append(_post_text(title_text))
     content.append(_post_text(""))
-    content.append(divider)
     content.append(_post_text(""))
 
     # ── 文章列表 ──
     for i, article in enumerate(digest.articles[:10], 1):
         content.append(_post_text(str(i)))
-
-        title = article.title[:TRUNCATE_TITLE]
-        content.append(_post_text(f"📰 {title}"))
+        content.append(_post_text(f"📰 {article.title[:TRUNCATE_TITLE]}"))
 
         blog_url = article.raw_url or BLOG_BASE_URL
         content.append(_post_link(f"🔗 {blog_url}", blog_url))
 
         if article.summary:
-            summary = article.summary[:TRUNCATE_SUMMARY]
-            content.append(_post_text(f"📝 {summary}"))
+            content.append(_post_text(f"📝 {article.summary[:TRUNCATE_SUMMARY]}"))
 
         content.append(_post_text(""))
-        content.append(divider)
         content.append(_post_text(""))
 
     post_content = json.dumps({
