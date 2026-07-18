@@ -17,16 +17,17 @@ log = logging.getLogger(__name__)
 BLOG_BASE_URL = "https://ai-news-2li.pages.dev"
 TRUNCATE_TITLE = 60
 TRUNCATE_SUMMARY = 100
+SEPARATOR = "─" * 24
 
 
 def format_feishu_message(digest: DailyDigest) -> dict:
     """将 DailyDigest 格式化为飞书富文本消息"""
     content = []
-    divider = {"tag": "hr"}
+    divider = _post_text(SEPARATOR)
 
     # ── 标题 ──
     title_text = f"📰 AI 早报 | {digest.date}" if digest.date else "📰 AI 早报"
-    content.append(_post_text(title_text, bold=True))
+    content.append(_post_text(title_text))
     content.append(_post_text(""))
     content.append(divider)
     content.append(_post_text(""))
@@ -49,9 +50,6 @@ def format_feishu_message(digest: DailyDigest) -> dict:
         content.append(divider)
         content.append(_post_text(""))
 
-    # ── 尾部 ──
-    content.append(_post_text("🤖 本内容由 AI 辅助生成，仅供参考"))
-
     post_content = json.dumps({
         "post": {
             "zh_cn": {
@@ -68,16 +66,11 @@ def format_feishu_message(digest: DailyDigest) -> dict:
     }
 
 
-def _post_text(text: str, bold: bool = False) -> dict:
-    """飞书文本节点"""
-    tag = {"tag": "text", "text": text}
-    if bold:
-        tag["style"] = ["bold"]
-    return tag
+def _post_text(text: str) -> dict:
+    return {"tag": "text", "text": text}
 
 
 def _post_link(text: str, url: str) -> dict:
-    """飞书链接节点"""
     return {"tag": "a", "text": text, "href": url}
 
 
@@ -162,7 +155,6 @@ class FeishuPublisher(BasePublisher):
 
 
 def _extract_text(html: str) -> str:
-    """从 HTML 中提取纯文本"""
     import re
     text = re.sub(r"<[^>]+>", "", html)
     text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
